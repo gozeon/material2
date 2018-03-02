@@ -10,6 +10,7 @@ import {
   TemplateRef,
   SkipSelf,
   Optional,
+  Injectable,
   Injector,
   Inject,
   ComponentRef
@@ -44,6 +45,7 @@ import {
 /**
  * Service to open modal dialogs.
  */
+@Injectable()
 export class Dialog {
   /** Stream that emits when all dialogs are closed. */
   get _afterAllClosed(): Observable<void> {
@@ -171,8 +173,7 @@ export class Dialog {
     return this.overlay.create(overlayConfig);
   }
 
-
-    /**
+  /**
    * Attaches an MatDialogContainer to a dialog's already-created overlay.
    * @param overlay Reference to the dialog's underlying overlay.
    * @param config The dialog configuration.
@@ -188,7 +189,7 @@ export class Dialog {
   }
 
 
-    /**
+  /**
    * Attaches the user-provided component to the already-created MatDialogContainer.
    * @param componentOrTemplateRef The type of component being loaded into the dialog,
    *     or a TemplateRef to instantiate as the content.
@@ -218,7 +219,7 @@ export class Dialog {
     return dialogRef;
   }
 
-   /**
+  /**
    * Attaches the user-provided component to the already-created MatDialogContainer.
    * @param componentOrTemplateRef The type of component being loaded into the dialog,
    *     or a TemplateRef to instantiate as the content.
@@ -263,13 +264,17 @@ export class Dialog {
     const userInjector = config && config.viewContainerRef && config.viewContainerRef.injector;
     const injectionTokens = new WeakMap();
 
-    injectionTokens.set(this.injector.get(DIALOG_REF), dialogRef);
-    injectionTokens.set(this.injector.get(DIALOG_CONTAINER), dialogContainer);
-    injectionTokens.set(DIALOG_DATA, config.data);
-    injectionTokens.set(Directionality, {
-      value: config.direction,
-      change: observableOf()
-    });
+    injectionTokens
+      .set(this.injector.get(DIALOG_REF), dialogRef)
+      .set(this.injector.get(DIALOG_CONTAINER), dialogContainer)
+      .set(DIALOG_DATA, config.data);
+
+    if (!userInjector || !userInjector.get(Directionality, null)) {
+      injectionTokens.set(Directionality, {
+        value: config.direction,
+        change: observableOf()
+      });
+    }
 
     return new PortalInjector(userInjector || this.injector, injectionTokens);
   }

@@ -7,10 +7,16 @@
  */
 
 import {
-  ChangeDetectionStrategy, ChangeDetectorRef,
-  Component, ContentChild,
-  ContentChildren, forwardRef, Inject, Input,
-  ViewEncapsulation
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
+  Component,
+  ContentChild,
+  ContentChildren,
+  forwardRef,
+  Inject,
+  Input,
+  ViewEncapsulation,
+  QueryList,
 } from '@angular/core';
 import {MatDrawer, MatDrawerContainer, MatDrawerContent} from './drawer';
 import {matDrawerAnimations} from './drawer-animations';
@@ -51,7 +57,6 @@ export class MatSidenavContent extends MatDrawerContent {
     '[@transform]': '_animationState',
     '(@transform.start)': '_onAnimationStart($event)',
     '(@transform.done)': '_onAnimationEnd($event)',
-    '(keydown)': 'handleKeydown($event)',
     // must prevent the browser from aligning text based on value
     '[attr.align]': 'null',
     '[class.mat-drawer-end]': 'position === "end"',
@@ -107,7 +112,6 @@ export class MatSidenav extends MatDrawer {
   preserveWhitespaces: false,
 })
 export class MatSidenavContainer extends MatDrawerContainer {
-  @ContentChildren(MatSidenav) _drawers;
-
-  @ContentChild(MatSidenavContent) _content;
+  @ContentChildren(MatSidenav) _drawers: QueryList<MatSidenav>;
+  @ContentChild(MatSidenavContent) _content: MatSidenavContent;
 }
