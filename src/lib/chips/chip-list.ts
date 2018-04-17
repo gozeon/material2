@@ -32,12 +32,11 @@ import {
 import {ControlValueAccessor, FormGroupDirective, NgControl, NgForm} from '@angular/forms';
 import {CanUpdateErrorState, ErrorStateMatcher, mixinErrorState} from '@angular/material/core';
 import {MatFormFieldControl} from '@angular/material/form-field';
-import {Observable} from 'rxjs/Observable';
-import {merge} from 'rxjs/observable/merge';
-import {startWith} from 'rxjs/operators/startWith';
-import {Subscription} from 'rxjs/Subscription';
+import {merge, Observable, Subscription} from 'rxjs';
+import {startWith} from 'rxjs/operators';
 import {MatChip, MatChipEvent, MatChipSelectionChange} from './chip';
 import {MatChipInput} from './chip-input';
+
 
 // Boilerplate for applying mixins to MatChipList.
 /** @docs-private */
@@ -87,12 +86,12 @@ export class MatChipListChange {
     'class': 'mat-chip-list',
     '(focus)': 'focus()',
     '(blur)': '_blur()',
-    '(keydown)': '_keydown($event)'
+    '(keydown)': '_keydown($event)',
+    '[id]': '_uid',
   },
   providers: [{provide: MatFormFieldControl, useExisting: MatChipList}],
   styleUrls: ['chips.css'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MatChipList extends _MatChipListMixinBase implements MatFormFieldControl<any>,
@@ -131,7 +130,7 @@ export class MatChipList extends _MatChipListMixinBase implements MatFormFieldCo
   protected _chipInput: MatChipInput;
 
   /** Uid of the chip list */
-  protected _uid: string = `mat-chip-list-${nextUniqueId++}`;
+  _uid: string = `mat-chip-list-${nextUniqueId++}`;
 
   /** The aria-describedby attribute on the chip list for improved a11y. */
   _ariaDescribedby: string;
@@ -207,13 +206,9 @@ export class MatChipList extends _MatChipListMixinBase implements MatFormFieldCo
    * Implemented as part of MatFormFieldControl.
    * @docs-private
    */
-  @Input()
-  get id(): string { return this._id || this._uid; }
-  set id(value: string) {
-    this._id = value;
-    this.stateChanges.next();
+  get id(): string {
+    return this._chipInput ? this._chipInput.id : this._uid;
   }
-  protected _id: string;
 
   /**
    * Implemented as part of MatFormFieldControl.
@@ -310,7 +305,7 @@ export class MatChipList extends _MatChipListMixinBase implements MatFormFieldCo
 
   /** Combined stream of all of the child chips' remove change events. */
   get chipRemoveChanges(): Observable<MatChipEvent> {
-    return merge(...this.chips.map(chip => chip.destroy));
+    return merge(...this.chips.map(chip => chip.destroyed));
   }
 
   /** Event emitted when the selected chip list value has been changed by the user. */
@@ -366,6 +361,8 @@ export class MatChipList extends _MatChipListMixinBase implements MatFormFieldCo
 
       // Check to see if we have a destroyed chip and need to refocus
       this._updateFocusForDestroyedChips();
+
+      this.stateChanges.next();
     });
   }
 
@@ -520,7 +517,7 @@ export class MatChipList extends _MatChipListMixinBase implements MatFormFieldCo
   protected _updateFocusForDestroyedChips() {
     let chipsArray = this.chips;
 
-    if (this._lastDestroyedIndex != null && chipsArray.length > 0) {
+    if (this._lastDestroyedIndex != null && chipsArray.length > 0 && this.focused) {
       // Check whether the destroyed chip was the last item
       const newFocusIndex = Math.min(this._lastDestroyedIndex, chipsArray.length - 1);
       this._keyManager.setActiveItem(newFocusIndex);
@@ -569,8 +566,6 @@ export class MatChipList extends _MatChipListMixinBase implements MatFormFieldCo
       if (correspondingChip) {
         if (isUserInput) {
           this._keyManager.setActiveItem(correspondingChip);
-        } else {
-          this._keyManager.updateActiveItem(correspondingChip);
         }
       }
     }
@@ -654,6 +649,7 @@ export class MatChipList extends _MatChipListMixinBase implements MatFormFieldCo
 
   /** When blurred, mark the field as touched when focus moved outside the chip list. */
   _blur() {
+    this._keyManager.setActiveItem(-1);
     if (!this.disabled) {
       if (this._chipInput) {
         // If there's a chip input, we should check whether the focus moved to chip input.

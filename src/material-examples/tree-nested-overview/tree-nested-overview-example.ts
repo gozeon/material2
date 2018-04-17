@@ -1,8 +1,7 @@
-import {Component, Injectable} from '@angular/core';
 import {NestedTreeControl} from '@angular/cdk/tree';
+import {Component, Injectable} from '@angular/core';
 import {MatTreeNestedDataSource} from '@angular/material/tree';
-import {of} from 'rxjs/observable/of';
-import {BehaviorSubject} from 'rxjs/BehaviorSubject';
+import {BehaviorSubject, of as observableOf} from 'rxjs';
 
 /**
  * Json node data with nested structure. Each node has a filename and a value or a list of children
@@ -16,7 +15,7 @@ export class FileNode {
 /**
  * The Json tree data in string. The data could be parsed into Json object
  */
-const TREE_DATA = `{"Tina":
+const TREE_DATA = `
   {
     "Documents": {
       "angular": {
@@ -51,7 +50,7 @@ const TREE_DATA = `{"Tina":
         "Calendar": "app",
         "Webstorm": "app"
     }
-}}`;
+  }`;
 
 /**
  * File database, it can build a tree structured Json object from string.
@@ -86,7 +85,7 @@ export class FileDatabase {
    * Build the file structure tree. The `value` is the Json object, or a sub-tree of a Json object.
    * The return value is the list of `FileNode`.
    */
-  buildFileTree(value: any, level: number) {
+  buildFileTree(value: any, level: number): FileNode[] {
     let data: any[] = [];
     for (let k in value) {
       let v = value[k];
@@ -126,7 +125,7 @@ export class TreeNestedOverviewExample {
     database.dataChange.subscribe(data => this.nestedDataSource.data = data);
   }
 
-  private _getChildren = (node: FileNode) => { return of(node.children); };
+  private _getChildren = (node: FileNode) => { return observableOf(node.children); };
 
   hasNestedChild = (_: number, nodeData: FileNode) => {return !(nodeData.type); };
 }

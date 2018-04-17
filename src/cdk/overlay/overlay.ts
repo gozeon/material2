@@ -6,27 +6,30 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {Directionality} from '@angular/cdk/bidi';
+import {DomPortalOutlet} from '@angular/cdk/portal';
+import {DOCUMENT} from '@angular/common';
 import {
-  ComponentFactoryResolver,
-  Injectable,
   ApplicationRef,
+  ComponentFactoryResolver,
+  Inject,
+  Injectable,
   Injector,
   NgZone,
-  Inject,
 } from '@angular/core';
-import {DomPortalOutlet} from '@angular/cdk/portal';
+import {OverlayKeyboardDispatcher} from './keyboard/overlay-keyboard-dispatcher';
 import {OverlayConfig} from './overlay-config';
+import {OverlayContainer} from './overlay-container';
 import {OverlayRef} from './overlay-ref';
 import {OverlayPositionBuilder} from './position/overlay-position-builder';
-import {OverlayKeyboardDispatcher} from './keyboard/overlay-keyboard-dispatcher';
-import {OverlayContainer} from './overlay-container';
 import {ScrollStrategyOptions} from './scroll/index';
-import {DOCUMENT} from '@angular/common';
-import {Directionality} from '@angular/cdk/bidi';
 
 
 /** Next overlay unique ID. */
 let nextUniqueId = 0;
+
+// Note that Overlay is *not* scoped to the app root because the ComponentFactoryResolver
+// it needs is different based on where OverlayModule is imported.
 
 /**
  * Service to create Overlays. Overlays are dynamically added pieces of floating UI, meant to be
@@ -57,20 +60,15 @@ export class Overlay {
    * @returns Reference to the created overlay.
    */
   create(config?: OverlayConfig): OverlayRef {
-    const pane = this._createPaneElement();
+    const host = this._createHostElement();
+    const pane = this._createPaneElement(host);
     const portalOutlet = this._createPortalOutlet(pane);
     const overlayConfig = new OverlayConfig(config);
 
     overlayConfig.direction = overlayConfig.direction || this._directionality.value;
 
-    return new OverlayRef(
-      portalOutlet,
-      pane,
-      overlayConfig,
-      this._ngZone,
-      this._keyboardDispatcher,
-      this._document
-    );
+    return new OverlayRef(portalOutlet, host, pane, overlayConfig, this._ngZone,
+      this._keyboardDispatcher, this._document);
   }
 
   /**
@@ -86,14 +84,25 @@ export class Overlay {
    * Creates the DOM element for an overlay and appends it to the overlay container.
    * @returns Newly-created pane element
    */
-  private _createPaneElement(): HTMLElement {
+  private _createPaneElement(host: HTMLElement): HTMLElement {
     const pane = this._document.createElement('div');
 
     pane.id = `cdk-overlay-${nextUniqueId++}`;
     pane.classList.add('cdk-overlay-pane');
-    this._overlayContainer.getContainerElement().appendChild(pane);
+    host.appendChild(pane);
 
     return pane;
+  }
+
+  /**
+   * Creates the host element that wraps around an overlay
+   * and can be used for advanced positioning.
+   * @returns Newly-create host element.
+   */
+  private _createHostElement(): HTMLElement {
+    const host = this._document.createElement('div');
+    this._overlayContainer.getContainerElement().appendChild(host);
+    return host;
   }
 
   /**

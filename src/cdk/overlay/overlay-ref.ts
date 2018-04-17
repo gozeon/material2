@@ -9,11 +9,11 @@
 import {Direction} from '@angular/cdk/bidi';
 import {ComponentPortal, Portal, PortalOutlet, TemplatePortal} from '@angular/cdk/portal';
 import {ComponentRef, EmbeddedViewRef, NgZone} from '@angular/core';
-import {Observable} from 'rxjs/Observable';
-import {take} from 'rxjs/operators/take';
-import {Subject} from 'rxjs/Subject';
+import {Observable, Subject} from 'rxjs';
+import {take} from 'rxjs/operators';
 import {OverlayKeyboardDispatcher} from './keyboard/overlay-keyboard-dispatcher';
 import {OverlayConfig} from './overlay-config';
+import {coerceCssPixelValue} from '@angular/cdk/coercion';
 
 
 /** An object where all of its properties cannot be written. */
@@ -36,6 +36,7 @@ export class OverlayRef implements PortalOutlet {
 
   constructor(
       private _portalOutlet: PortalOutlet,
+      private _host: HTMLElement,
       private _pane: HTMLElement,
       private _config: ImmutableObject<OverlayConfig>,
       private _ngZone: NgZone,
@@ -55,6 +56,15 @@ export class OverlayRef implements PortalOutlet {
   /** The overlay's backdrop HTML element. */
   get backdropElement(): HTMLElement | null {
     return this._backdropElement;
+  }
+
+  /**
+   * Wrapper around the panel element. Can be used for advanced
+   * positioning where a wrapper with specific styling is
+   * required around the overlay pane.
+   */
+  get hostElement(): HTMLElement {
+    return this._host;
   }
 
   attach<T>(portal: ComponentPortal<T>): ComponentRef<T>;
@@ -87,12 +97,15 @@ export class OverlayRef implements PortalOutlet {
     // Update the position once the zone is stable so that the overlay will be fully rendered
     // before attempting to position it, as the position may depend on the size of the rendered
     // content.
-    this._ngZone.onStable.asObservable().pipe(take(1)).subscribe(() => {
-      // The overlay could've been detached before the zone has stabilized.
-      if (this.hasAttached()) {
-        this.updatePosition();
-      }
-    });
+    this._ngZone.onStable
+      .asObservable()
+      .pipe(take(1))
+      .subscribe(() => {
+        // The overlay could've been detached before the zone has stabilized.
+        if (this.hasAttached()) {
+          this.updatePosition();
+        }
+      });
 
     // Enable pointer events for the overlay pane element.
     this._togglePointerEvents(true);
@@ -104,7 +117,7 @@ export class OverlayRef implements PortalOutlet {
     if (this._config.panelClass) {
       // We can't do a spread here, because IE doesn't support setting multiple classes.
       if (Array.isArray(this._config.panelClass)) {
-        this._config.panelClass.forEach(cls => this._pane.classList.add(cls));
+        this._config.panelClass.forEach(cssClass => this._pane.classList.add(cssClass));
       } else {
         this._pane.classList.add(this._config.panelClass);
       }
@@ -173,6 +186,11 @@ export class OverlayRef implements PortalOutlet {
     this._backdropClick.complete();
     this._keydownEvents.complete();
 
+    if (this._host && this._host.parentNode) {
+      this._host.parentNode.removeChild(this._host);
+      this._host = null!;
+    }
+
     if (isAttached) {
       this._detachments.next();
     }
@@ -237,27 +255,27 @@ export class OverlayRef implements PortalOutlet {
   /** Updates the size of the overlay element based on the overlay config. */
   private _updateElementSize() {
     if (this._config.width || this._config.width === 0) {
-      this._pane.style.width = formatCssUnit(this._config.width);
+      this._pane.style.width = coerceCssPixelValue(this._config.width);
     }
 
     if (this._config.height || this._config.height === 0) {
-      this._pane.style.height = formatCssUnit(this._config.height);
+      this._pane.style.height = coerceCssPixelValue(this._config.height);
     }
 
     if (this._config.minWidth || this._config.minWidth === 0) {
-      this._pane.style.minWidth = formatCssUnit(this._config.minWidth);
+      this._pane.style.minWidth = coerceCssPixelValue(this._config.minWidth);
     }
 
     if (this._config.minHeight || this._config.minHeight === 0) {
-      this._pane.style.minHeight = formatCssUnit(this._config.minHeight);
+      this._pane.style.minHeight = coerceCssPixelValue(this._config.minHeight);
     }
 
     if (this._config.maxWidth || this._config.maxWidth === 0) {
-      this._pane.style.maxWidth = formatCssUnit(this._config.maxWidth);
+      this._pane.style.maxWidth = coerceCssPixelValue(this._config.maxWidth);
     }
 
     if (this._config.maxHeight || this._config.maxHeight === 0) {
-      this._pane.style.maxHeight = formatCssUnit(this._config.maxHeight);
+      this._pane.style.maxHeight = coerceCssPixelValue(this._config.maxHeight);
     }
   }
 
@@ -279,7 +297,7 @@ export class OverlayRef implements PortalOutlet {
 
     // Insert the backdrop before the pane in the DOM order,
     // in order to handle stacked overlays properly.
-    this._pane.parentElement!.insertBefore(this._backdropElement, this._pane);
+    this._host.parentElement!.insertBefore(this._backdropElement, this._host);
 
     // Forward backdrop clicks such that the consumer of the overlay can perform whatever
     // action desired when such a click occurs (usually closing the overlay).
@@ -308,8 +326,8 @@ export class OverlayRef implements PortalOutlet {
    * in its original DOM position.
    */
   private _updateStackingOrder() {
-    if (this._pane.nextSibling) {
-      this._pane.parentNode!.appendChild(this._pane);
+    if (this._host.nextSibling) {
+      this._host.parentNode!.appendChild(this._host);
     }
   }
 
@@ -347,15 +365,9 @@ export class OverlayRef implements PortalOutlet {
       // Run this outside the Angular zone because there's nothing that Angular cares about.
       // If it were to run inside the Angular zone, every test that used Overlay would have to be
       // either async or fakeAsync.
-      this._ngZone.runOutsideAngular(() => {
-        setTimeout(finishDetach, 500);
-      });
+      this._ngZone.runOutsideAngular(() => setTimeout(finishDetach, 500));
     }
   }
-}
-
-function formatCssUnit(value: number | string) {
-  return typeof value === 'string' ? value as string : `${value}px`;
 }
 
 

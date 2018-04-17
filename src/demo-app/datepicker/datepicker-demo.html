@@ -14,14 +14,14 @@
   </mat-form-field>
 </p>
 <p>
-  <mat-form-field>
+  <mat-form-field color="accent">
     <mat-label>Min date</mat-label>
     <input matInput [matDatepicker]="minDatePicker" [(ngModel)]="minDate"
         [disabled]="inputDisabled">
     <mat-datepicker-toggle matSuffix [for]="minDatePicker"></mat-datepicker-toggle>
     <mat-datepicker #minDatePicker [touchUi]="touch" [disabled]="datepickerDisabled"></mat-datepicker>
   </mat-form-field>
-  <mat-form-field>
+  <mat-form-field color="accent">
     <mat-label>Max date</mat-label>
     <input matInput [matDatepicker]="maxDatePicker" [(ngModel)]="maxDate"
         [disabled]="inputDisabled">
@@ -30,7 +30,7 @@
   </mat-form-field>
 </p>
 <p>
-  <mat-form-field>
+  <mat-form-field color="accent">
     <mat-label>Start at date</mat-label>
     <input matInput [matDatepicker]="startAtPicker" [(ngModel)]="startAt"
         [disabled]="inputDisabled">
@@ -142,5 +142,15 @@
            [max]="maxDate" [matDatepickerFilter]="filterOdd ? dateFilter : null">
     <mat-datepicker #datePicker4 [touchUi]="touch" [startAt]="startAt"
                     [startView]="yearView ? 'year' : 'month'"></mat-datepicker>
+  </mat-form-field>
+</p>
+
+<h2>Datepicker with custom header</h2>
+<p>
+  <mat-form-field>
+    <mat-label>Custom calendar header</mat-label>
+    <input matInput [matDatepicker]="customHeaderPicker">
+    <mat-datepicker-toggle matSuffix [for]="customHeaderPicker"></mat-datepicker-toggle>
+    <mat-datepicker #customHeaderPicker [calendarHeaderComponent]="customHeader"></mat-datepicker>
   </mat-form-field>
 </p>

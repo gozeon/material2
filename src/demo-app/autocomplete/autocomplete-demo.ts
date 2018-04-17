@@ -8,8 +8,8 @@
 
 import {Component, ViewChild, ViewEncapsulation} from '@angular/core';
 import {FormControl, NgModel} from '@angular/forms';
-import {startWith} from 'rxjs/operators/startWith';
-import {map} from 'rxjs/operators/map';
+import {map, startWith} from 'rxjs/operators';
+
 
 export interface State {
   code: string;
@@ -27,7 +27,6 @@ export interface StateGroup {
   templateUrl: 'autocomplete-demo.html',
   styleUrls: ['autocomplete-demo.css'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
 })
 export class AutocompleteDemo {
   stateCtrl: FormControl;

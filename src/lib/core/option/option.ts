@@ -8,7 +8,7 @@
 
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
 import {ENTER, SPACE} from '@angular/cdk/keycodes';
-import {Subject} from 'rxjs/Subject';
+import {Subject} from 'rxjs';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -23,6 +23,7 @@ import {
   InjectionToken,
   Inject,
   AfterViewChecked,
+  OnDestroy,
 } from '@angular/core';
 import {MatOptgroup} from './optgroup';
 
@@ -81,10 +82,9 @@ export const MAT_OPTION_PARENT_COMPONENT =
   styleUrls: ['option.css'],
   templateUrl: 'option.html',
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class MatOption implements AfterViewChecked {
+export class MatOption implements AfterViewChecked, OnDestroy {
   private _selected = false;
   private _active = false;
   private _disabled = false;
@@ -240,6 +240,10 @@ export class MatOption implements AfterViewChecked {
         this._stateChanges.next();
       }
     }
+  }
+
+  ngOnDestroy() {
+    this._stateChanges.complete();
   }
 
   /** Emits the selection change event. */

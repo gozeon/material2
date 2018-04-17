@@ -6,21 +6,19 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import {Directionality} from '@angular/cdk/bidi';
-import {DOWN_ARROW, ENTER, ESCAPE, UP_ARROW, TAB} from '@angular/cdk/keycodes';
+import {DOWN_ARROW, ENTER, ESCAPE, TAB, UP_ARROW} from '@angular/cdk/keycodes';
 import {
-  ConnectedPositionStrategy,
+  FlexibleConnectedPositionStrategy,
   Overlay,
-  OverlayRef,
   OverlayConfig,
+  OverlayRef,
   PositionStrategy,
   ScrollStrategy,
+  ViewportRuler,
 } from '@angular/cdk/overlay';
 import {TemplatePortal} from '@angular/cdk/portal';
-import {filter} from 'rxjs/operators/filter';
-import {take} from 'rxjs/operators/take';
-import {switchMap} from 'rxjs/operators/switchMap';
-import {tap} from 'rxjs/operators/tap';
-import {delay} from 'rxjs/operators/delay';
+import {DOCUMENT} from '@angular/common';
+import {filter, take, switchMap, delay, tap} from 'rxjs/operators';
 import {
   ChangeDetectorRef,
   Directive,
@@ -28,6 +26,7 @@ import {
   forwardRef,
   Host,
   Inject,
+  inject,
   InjectionToken,
   Input,
   NgZone,
@@ -37,20 +36,13 @@ import {
 } from '@angular/core';
 import {ControlValueAccessor, NG_VALUE_ACCESSOR} from '@angular/forms';
 import {
+  _countGroupLabelsBeforeOption,
+  _getOptionScrollPosition,
   MatOption,
   MatOptionSelectionChange,
-  _getOptionScrollPosition,
-  _countGroupLabelsBeforeOption,
 } from '@angular/material/core';
 import {MatFormField} from '@angular/material/form-field';
-import {DOCUMENT} from '@angular/common';
-import {Observable} from 'rxjs/Observable';
-import {Subject} from 'rxjs/Subject';
-import {defer} from 'rxjs/observable/defer';
-import {fromEvent} from 'rxjs/observable/fromEvent';
-import {merge} from 'rxjs/observable/merge';
-import {of as observableOf} from 'rxjs/observable/of';
-import {Subscription} from 'rxjs/Subscription';
+import {Subscription, defer, fromEvent, merge, of as observableOf, Subject, Observable} from 'rxjs';
 import {MatAutocomplete} from './autocomplete';
 
 
@@ -68,20 +60,13 @@ export const AUTOCOMPLETE_PANEL_HEIGHT = 256;
 
 /** Injection token that determines the scroll handling while the autocomplete panel is open. */
 export const MAT_AUTOCOMPLETE_SCROLL_STRATEGY =
-    new InjectionToken<() => ScrollStrategy>('mat-autocomplete-scroll-strategy');
-
-/** @docs-private */
-export function MAT_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay: Overlay):
-    () => ScrollStrategy {
-  return () => overlay.scrollStrategies.reposition();
-}
-
-/** @docs-private */
-export const MAT_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER = {
-  provide: MAT_AUTOCOMPLETE_SCROLL_STRATEGY,
-  deps: [Overlay],
-  useFactory: MAT_AUTOCOMPLETE_SCROLL_STRATEGY_PROVIDER_FACTORY,
-};
+    new InjectionToken<() => ScrollStrategy>('mat-autocomplete-scroll-strategy', {
+      providedIn: 'root',
+      factory: () => {
+        const overlay = inject(Overlay);
+        return () => overlay.scrollStrategies.reposition();
+      }
+    });
 
 /**
  * Provider that allows the autocomplete to register as a ControlValueAccessor.
@@ -130,13 +115,16 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
   private _previousValue: string | number | null;
 
   /** Strategy that is used to position the panel. */
-  private _positionStrategy: ConnectedPositionStrategy;
+  private _positionStrategy: FlexibleConnectedPositionStrategy;
 
   /** Whether or not the label state is being overridden. */
   private _manuallyFloatingLabel = false;
 
   /** The subscription for closing actions (some are bound to document). */
   private _closingActionsSubscription: Subscription;
+
+  /** Subscription to viewport size changes. */
+  private _viewportSubscription = Subscription.EMPTY;
 
   /** Stream of keyboard events that can close the panel. */
   private readonly _closeKeyEventStream = new Subject<void>();
@@ -157,17 +145,22 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
               @Inject(MAT_AUTOCOMPLETE_SCROLL_STRATEGY) private _scrollStrategy,
               @Optional() private _dir: Directionality,
               @Optional() @Host() private _formField: MatFormField,
-              @Optional() @Inject(DOCUMENT) private _document: any) {}
+              @Optional() @Inject(DOCUMENT) private _document: any,
+              // @deletion-target 7.0.0 Make `_viewportRuler` required.
+              private _viewportRuler?: ViewportRuler) {}
 
   ngOnDestroy() {
+    this._viewportSubscription.unsubscribe();
     this._componentDestroyed = true;
     this._destroyPanel();
     this._closeKeyEventStream.complete();
   }
 
   /** Whether or not the autocomplete panel is open. */
-  get panelOpen(): boolean { return this._panelOpen && this.autocomplete.showPanel; }
-  private _panelOpen: boolean = false;
+  get panelOpen(): boolean {
+    return this._overlayAttached && this.autocomplete.showPanel;
+  }
+  private _overlayAttached: boolean = false;
 
   /** Opens the autocomplete suggestion panel. */
   openPanel(): void {
@@ -179,24 +172,30 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
   closePanel(): void {
     this._resetLabel();
 
-    if (this._panelOpen) {
-      this.autocomplete._isOpen = this._panelOpen = false;
+    if (!this._overlayAttached) {
+      return;
+    }
+
+    if (this.panelOpen) {
+      // Only emit if the panel was visible.
       this.autocomplete.closed.emit();
+    }
 
-      if (this._overlayRef && this._overlayRef.hasAttached()) {
-        this._overlayRef.detach();
-        this._closingActionsSubscription.unsubscribe();
-      }
+    this.autocomplete._isOpen = this._overlayAttached = false;
 
-      // Note that in some cases this can end up being called after the component is destroyed.
-      // Add a check to ensure that we don't try to run change detection on a destroyed view.
-      if (!this._componentDestroyed) {
-        // We need to trigger change detection manually, because
-        // `fromEvent` doesn't seem to do it at the proper time.
-        // This ensures that the label is reset when the
-        // user clicks outside.
-        this._changeDetectorRef.detectChanges();
-      }
+    if (this._overlayRef && this._overlayRef.hasAttached()) {
+      this._overlayRef.detach();
+      this._closingActionsSubscription.unsubscribe();
+    }
+
+    // Note that in some cases this can end up being called after the component is destroyed.
+    // Add a check to ensure that we don't try to run change detection on a destroyed view.
+    if (!this._componentDestroyed) {
+      // We need to trigger change detection manually, because
+      // `fromEvent` doesn't seem to do it at the proper time.
+      // This ensures that the label is reset when the
+      // user clicks outside.
+      this._changeDetectorRef.detectChanges();
     }
   }
 
@@ -207,11 +206,11 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
   get panelClosingActions(): Observable<MatOptionSelectionChange> {
     return merge(
       this.optionSelections,
-      this.autocomplete._keyManager.tabOut.pipe(filter(() => this._panelOpen)),
+      this.autocomplete._keyManager.tabOut.pipe(filter(() => this._overlayAttached)),
       this._closeKeyEventStream,
       this._outsideClickStream,
       this._overlayRef ?
-          this._overlayRef.detachments().pipe(filter(() => this._panelOpen)) :
+          this._overlayRef.detachments().pipe(filter(() => this._overlayAttached)) :
           observableOf()
     );
   }
@@ -253,7 +252,7 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
       const formField = this._formField ?
           this._formField._elementRef.nativeElement : null;
 
-      return this._panelOpen &&
+      return this._overlayAttached &&
               clickTarget !== this._element.nativeElement &&
               (!formField || !formField.contains(clickTarget)) &&
               (!!this._overlayRef && !this._overlayRef.overlayElement.contains(clickTarget));
@@ -404,7 +403,7 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
   private _subscribeToClosingActions(): Subscription {
     const firstStable = this._zone.onStable.asObservable().pipe(take(1));
     const optionChanges = this.autocomplete.options.changes.pipe(
-      tap(() => this._positionStrategy.recalculateLastPosition()),
+      tap(() => this._positionStrategy.reapplyLastPosition()),
       // Defer emitting to the stream until the next tick, because changing
       // bindings in here will cause "changed after checked" errors.
       delay(0)
@@ -490,6 +489,14 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
     if (!this._overlayRef) {
       this._portal = new TemplatePortal(this.autocomplete.template, this._viewContainerRef);
       this._overlayRef = this._overlay.create(this._getOverlayConfig());
+
+      if (this._viewportRuler) {
+        this._viewportSubscription = this._viewportRuler.change().subscribe(() => {
+          if (this.panelOpen && this._overlayRef) {
+            this._overlayRef.updateSize({width: this._getHostWidth()});
+          }
+        });
+      }
     } else {
       /** Update the panel width, in case the host width has changed */
       this._overlayRef.updateSize({width: this._getHostWidth()});
@@ -503,7 +510,7 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
     const wasOpen = this.panelOpen;
 
     this.autocomplete._setVisibility();
-    this.autocomplete._isOpen = this._panelOpen = true;
+    this.autocomplete._isOpen = this._overlayAttached = true;
 
     // We need to do an extra `panelOpen` check in here, because the
     // autocomplete won't be shown if there are no options.
@@ -522,12 +529,15 @@ export class MatAutocompleteTrigger implements ControlValueAccessor, OnDestroy {
   }
 
   private _getOverlayPosition(): PositionStrategy {
-    this._positionStrategy = this._overlay.position().connectedTo(
-        this._getConnectedElement(),
-        {originX: 'start', originY: 'bottom'}, {overlayX: 'start', overlayY: 'top'})
-        .withFallbackPosition(
-            {originX: 'start', originY: 'top'}, {overlayX: 'start', overlayY: 'bottom'}
-        );
+    this._positionStrategy = this._overlay.position()
+      .flexibleConnectedTo(this._getConnectedElement())
+      .withFlexibleDimensions(false)
+      .withPush(false)
+      .withPositions([
+        {originX: 'start', originY: 'bottom', overlayX: 'start', overlayY: 'top'},
+        {originX: 'start', originY: 'top', overlayX: 'start', overlayY: 'bottom'}
+      ]);
+
     return this._positionStrategy;
   }
 

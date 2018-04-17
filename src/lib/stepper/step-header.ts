@@ -7,7 +7,6 @@
  */
 
 import {FocusMonitor} from '@angular/cdk/a11y';
-import {coerceBooleanProperty, coerceNumberProperty} from '@angular/cdk/coercion';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -18,9 +17,10 @@ import {
   ViewEncapsulation,
   TemplateRef,
 } from '@angular/core';
-import {Subscription} from 'rxjs/Subscription';
+import {Subscription} from 'rxjs';
 import {MatStepLabel} from './step-label';
 import {MatStepperIntl} from './stepper-intl';
+import {MatStepperIconContext} from './stepper-icon';
 
 
 @Component({
@@ -33,7 +33,6 @@ import {MatStepperIntl} from './stepper-intl';
     'role': 'tab',
   },
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MatStepHeader implements OnDestroy {
@@ -46,31 +45,19 @@ export class MatStepHeader implements OnDestroy {
   @Input() label: MatStepLabel | string;
 
   /** Overrides for the header icons, passed in via the stepper. */
-  @Input() iconOverrides: {[key: string]: TemplateRef<any>};
+  @Input() iconOverrides: {[key: string]: TemplateRef<MatStepperIconContext>};
 
   /** Index of the given step. */
-  @Input()
-  get index(): number { return this._index; }
-  set index(value: number) { this._index = coerceNumberProperty(value); }
-  private _index: number;
+  @Input() index: number;
 
   /** Whether the given step is selected. */
-  @Input()
-  get selected(): boolean { return this._selected; }
-  set selected(value: boolean) { this._selected = coerceBooleanProperty(value); }
-  private _selected: boolean;
+  @Input() selected: boolean;
 
   /** Whether the given step label is active. */
-  @Input()
-  get active(): boolean { return this._active; }
-  set active(value: boolean) { this._active = coerceBooleanProperty(value); }
-  private _active: boolean;
+  @Input() active: boolean;
 
   /** Whether the given step is optional. */
-  @Input()
-  get optional(): boolean { return this._optional; }
-  set optional(value: boolean) { this._optional = coerceBooleanProperty(value); }
-  private _optional: boolean;
+  @Input() optional: boolean;
 
   constructor(
     public _intl: MatStepperIntl,
@@ -99,5 +86,18 @@ export class MatStepHeader implements OnDestroy {
   /** Returns the host HTML element. */
   _getHostElement() {
     return this._element.nativeElement;
+  }
+
+  /** Template context variables that are exposed to the `matStepperIcon` instances. */
+  _getIconContext(): MatStepperIconContext {
+    return {
+      index: this.index,
+      active: this.active,
+      optional: this.optional
+    };
+  }
+
+  focus() {
+    this._getHostElement().focus();
   }
 }

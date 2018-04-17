@@ -28,7 +28,6 @@ import {
   MatTooltipModule,
   SCROLL_THROTTLE_MS,
   TOOLTIP_PANEL_CLASS,
-  TooltipPosition,
   MAT_TOOLTIP_DEFAULT_OPTIONS,
 } from './index';
 
@@ -306,24 +305,48 @@ describe('MatTooltip', () => {
       expect(tooltipDirective._isTooltipVisible()).toBe(true);
     }));
 
-    it('should remove the tooltip when changing position', () => {
-      const initialPosition: TooltipPosition = 'below';
-      const changedPosition: TooltipPosition = 'above';
-
-      assertTooltipInstance(tooltipDirective, false);
-
-      tooltipDirective.position = initialPosition;
+    it('should be able to update the tooltip position while open', fakeAsync(() => {
+      tooltipDirective.position = 'below';
       tooltipDirective.show();
-      expect(tooltipDirective._tooltipInstance).toBeTruthy();
+      tick();
 
-      // Same position value should not remove the tooltip
-      tooltipDirective.position = initialPosition;
-      expect(tooltipDirective._tooltipInstance).toBeTruthy();
+      assertTooltipInstance(tooltipDirective, true);
 
-      // Different position value should destroy the tooltip
-      tooltipDirective.position = changedPosition;
-      assertTooltipInstance(tooltipDirective, false);
-    });
+      tooltipDirective.position = 'above';
+      spyOn(tooltipDirective._overlayRef!, 'updatePosition').and.callThrough();
+      fixture.detectChanges();
+      tick();
+
+      assertTooltipInstance(tooltipDirective, true);
+      expect(tooltipDirective._overlayRef!.updatePosition).toHaveBeenCalled();
+    }));
+
+    it('should not throw when updating the position for a closed tooltip', fakeAsync(() => {
+      tooltipDirective.position = 'left';
+      tooltipDirective.show(0);
+      fixture.detectChanges();
+      tick();
+
+      tooltipDirective.hide(0);
+      fixture.detectChanges();
+      tick();
+
+      // At this point the animation should be able to complete itself and trigger the
+      // _animationDone function, but for unknown reasons in the test infrastructure,
+      // this does not occur. Manually call the hook so the animation subscriptions get invoked.
+      tooltipDirective._tooltipInstance!._animationDone({
+        fromState: 'visible',
+        toState: 'hidden',
+        totalTime: 150,
+        phaseName: 'done',
+      } as AnimationEvent);
+
+      expect(() => {
+        tooltipDirective.position = 'right';
+        fixture.detectChanges();
+        tick();
+      }).not.toThrow();
+    }));
 
     it('should be able to modify the tooltip message', fakeAsync(() => {
       assertTooltipInstance(tooltipDirective, false);
@@ -431,12 +454,12 @@ describe('MatTooltip', () => {
       tooltipDirective.position = 'after';
       expect(tooltipDirective._getOrigin().main).toEqual(rightOrigin);
 
-      // Test expectations in LTR
+      // Test expectations in RTL
       dir.value = 'rtl';
       tooltipDirective.position = 'before';
-      expect(tooltipDirective._getOrigin().main).toEqual(rightOrigin);
-      tooltipDirective.position = 'after';
       expect(tooltipDirective._getOrigin().main).toEqual(leftOrigin);
+      tooltipDirective.position = 'after';
+      expect(tooltipDirective._getOrigin().main).toEqual(rightOrigin);
     });
 
     it('should consistently position before and after overlay position in ltr and rtl dir', () => {
@@ -451,15 +474,15 @@ describe('MatTooltip', () => {
       tooltipDirective.position = 'after';
       expect(tooltipDirective._getOverlayPosition().main).toEqual(rightOverlayPosition);
 
-      // Test expectations in LTR
+      // Test expectations in RTL
       dir.value = 'rtl';
       tooltipDirective.position = 'before';
-      expect(tooltipDirective._getOverlayPosition().main).toEqual(rightOverlayPosition);
-      tooltipDirective.position = 'after';
       expect(tooltipDirective._getOverlayPosition().main).toEqual(leftOverlayPosition);
+      tooltipDirective.position = 'after';
+      expect(tooltipDirective._getOverlayPosition().main).toEqual(rightOverlayPosition);
     });
 
-    it('should have consistent left transform origin in any dir', () => {
+    it('should have consistent left transform origin in ltr', () => {
       tooltipDirective.position = 'right';
       tooltipDirective.show();
       fixture.detectChanges();
@@ -469,7 +492,9 @@ describe('MatTooltip', () => {
       tooltipDirective.show();
       fixture.detectChanges();
       expect(tooltipDirective._tooltipInstance!._transformOrigin).toBe('left');
+    });
 
+    it('should have consistent left transform origin in rtl', () => {
       dir.value = 'rtl';
       tooltipDirective.position = 'before';
       tooltipDirective.show();
@@ -477,7 +502,7 @@ describe('MatTooltip', () => {
       expect(tooltipDirective._tooltipInstance!._transformOrigin).toBe('left');
     });
 
-    it('should have consistent right transform origin in any dir', () => {
+    it('should have consistent right transform origin in ltr', () => {
       // Move the button away from the edge of the screen so
       // we don't get into the fallback positions.
       fixture.componentInstance.button.nativeElement.style.margin = '300px';
@@ -491,6 +516,12 @@ describe('MatTooltip', () => {
       tooltipDirective.show();
       fixture.detectChanges();
       expect(tooltipDirective._tooltipInstance!._transformOrigin).toBe('right');
+    });
+
+    it('should have consistent right transform origin in rtl', () => {
+      // Move the button away from the edge of the screen so
+      // we don't get into the fallback positions.
+      fixture.componentInstance.button.nativeElement.style.margin = '300px';
 
       dir.value = 'rtl';
       tooltipDirective.position = 'after';

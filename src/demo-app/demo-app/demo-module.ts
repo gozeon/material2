@@ -19,7 +19,7 @@ import {ButtonDemo} from '../button/button-demo';
 import {CardDemo} from '../card/card-demo';
 import {CheckboxDemo, MatCheckboxDemoNestedChecklist} from '../checkbox/checkbox-demo';
 import {ChipsDemo} from '../chips/chips-demo';
-import {DatepickerDemo} from '../datepicker/datepicker-demo';
+import {CustomHeader, DatepickerDemo} from '../datepicker/datepicker-demo';
 import {DemoMaterialModule} from '../demo-material-module';
 import {ContentElementDialog, DialogDemo, IFrameDialog, JazzDialog} from '../dialog/dialog-demo';
 import {DrawerDemo} from '../drawer/drawer-demo';
@@ -63,6 +63,7 @@ import {DEMO_APP_ROUTES} from './routes';
 import {TableDemoModule} from '../table/table-demo-module';
 import {BadgeDemo} from '../badge/badge-demo';
 import {TreeDemoModule} from '../tree/tree-demo-module';
+import {ConnectedOverlayDemo, DemoOverlay} from '../connected-overlay/connected-overlay-demo';
 
 @NgModule({
   imports: [
@@ -87,6 +88,7 @@ import {TreeDemoModule} from '../tree/tree-demo-module';
     ChipsDemo,
     ContentElementDialog,
     DatepickerDemo,
+    CustomHeader,
     DemoApp,
     DialogDemo,
     DrawerDemo,
@@ -130,6 +132,9 @@ import {TreeDemoModule} from '../tree/tree-demo-module';
     TooltipDemo,
     TypographyDemo,
     ExampleBottomSheet,
+    ExpansionDemo,
+    ConnectedOverlayDemo,
+    DemoOverlay,
   ],
   providers: [
     {provide: OverlayContainer, useClass: FullscreenOverlayContainer},
@@ -144,6 +149,8 @@ import {TreeDemoModule} from '../tree/tree-demo-module';
     ScienceJoke,
     SpagettiPanel,
     ExampleBottomSheet,
+    CustomHeader,
+    DemoOverlay,
   ],
 })
 export class DemoModule {}

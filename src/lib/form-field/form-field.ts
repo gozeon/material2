@@ -6,6 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
+import {Directionality} from '@angular/cdk/bidi';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
 import {
   AfterContentChecked,
@@ -18,6 +19,7 @@ import {
   ContentChildren,
   ElementRef,
   Inject,
+  InjectionToken,
   Input,
   Optional,
   QueryList,
@@ -30,11 +32,9 @@ import {
   LabelOptions,
   MAT_LABEL_GLOBAL_OPTIONS,
   mixinColor,
-  ThemePalette
 } from '@angular/material/core';
-import {fromEvent} from 'rxjs/observable/fromEvent';
-import {startWith} from 'rxjs/operators/startWith';
-import {take} from 'rxjs/operators/take';
+import {EMPTY, fromEvent, merge} from 'rxjs';
+import {startWith, take} from 'rxjs/operators';
 import {MatError} from './error';
 import {matFormFieldAnimations} from './form-field-animations';
 import {MatFormFieldControl} from './form-field-control';
@@ -48,7 +48,7 @@ import {MatLabel} from './label';
 import {MatPlaceholder} from './placeholder';
 import {MatPrefix} from './prefix';
 import {MatSuffix} from './suffix';
-import {Directionality} from '@angular/cdk/bidi';
+import {Platform} from '@angular/cdk/platform';
 
 
 let nextUniqueId = 0;
@@ -69,11 +69,18 @@ export const _MatFormFieldMixinBase = mixinColor(MatFormFieldBase, 'primary');
 export type MatFormFieldAppearance = 'legacy' | 'standard' | 'fill' | 'outline';
 
 
+export interface MatFormFieldDefaultOptions {
+  appearance?: MatFormFieldAppearance;
+}
+
+export const MAT_FORM_FIELD_DEFAULT_OPTIONS =
+    new InjectionToken<MatFormFieldDefaultOptions>('MAT_FORM_FIELD_DEFAULT_OPTIONS');
+
+
 /** Container for form controls that applies Material Design styling and behavior. */
 @Component({
   moduleId: module.id,
-  // TODO(mmalerba): the input-container selectors and classes are deprecated and will be removed.
-  selector: 'mat-input-container, mat-form-field',
+  selector: 'mat-form-field',
   exportAs: 'matFormField',
   templateUrl: 'form-field.html',
   // MatInput is a directive and can't have styles, so we need to include its styles here.
@@ -89,12 +96,11 @@ export type MatFormFieldAppearance = 'legacy' | 'standard' | 'fill' | 'outline';
   ],
   animations: [matFormFieldAnimations.transitionMessages],
   host: {
-    'class': 'mat-input-container mat-form-field',
+    'class': 'mat-form-field',
     '[class.mat-form-field-appearance-standard]': 'appearance == "standard"',
     '[class.mat-form-field-appearance-fill]': 'appearance == "fill"',
     '[class.mat-form-field-appearance-outline]': 'appearance == "outline"',
     '[class.mat-form-field-appearance-legacy]': 'appearance == "legacy"',
-    '[class.mat-input-invalid]': '_control.errorState',
     '[class.mat-form-field-invalid]': '_control.errorState',
     '[class.mat-form-field-can-float]': '_canLabelFloat',
     '[class.mat-form-field-should-float]': '_shouldLabelFloat()',
@@ -114,7 +120,6 @@ export type MatFormFieldAppearance = 'legacy' | 'standard' | 'fill' | 'outline';
   },
   inputs: ['color'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 
@@ -123,15 +128,14 @@ export class MatFormField extends _MatFormFieldMixinBase
   private _labelOptions: LabelOptions;
 
   /** The form-field appearance style. */
-  @Input() appearance: MatFormFieldAppearance = 'legacy';
-
-  /**
-   * @deprecated Use `color` instead.
-   * @deletion-target 6.0.0
-   */
   @Input()
-  get dividerColor(): ThemePalette { return this.color; }
-  set dividerColor(value: ThemePalette) { this.color = value; }
+  get appearance(): MatFormFieldAppearance {
+    return this._appearance || this._defaultOptions && this._defaultOptions.appearance || 'legacy';
+  }
+  set appearance(value: MatFormFieldAppearance) {
+    this._appearance = value;
+  }
+  _appearance: MatFormFieldAppearance;
 
   /** Whether the required marker should be hidden. */
   @Input()
@@ -166,15 +170,6 @@ export class MatFormField extends _MatFormFieldMixinBase
 
   // Unique id for the hint label.
   _hintLabelId: string = `mat-hint-${nextUniqueId++}`;
-
-  /**
-   * Whether the placeholder should always float, never float or float as the user types.
-   * @deprecated Use floatLabel instead.
-   * @deletion-target 6.0.0
-   */
-  @Input()
-  get floatPlaceholder(): FloatLabelType { return this.floatLabel; }
-  set floatPlaceholder(value: FloatLabelType) { this.floatLabel = value; }
 
   /**
    * Whether the label should always float, never float or float as the user types.
@@ -221,7 +216,11 @@ export class MatFormField extends _MatFormFieldMixinBase
       public _elementRef: ElementRef,
       private _changeDetectorRef: ChangeDetectorRef,
       @Optional() @Inject(MAT_LABEL_GLOBAL_OPTIONS) labelOptions: LabelOptions,
-      @Optional() private _dir: Directionality) {
+      @Optional() private _dir: Directionality,
+      @Optional() @Inject(MAT_FORM_FIELD_DEFAULT_OPTIONS) private _defaultOptions:
+          MatFormFieldDefaultOptions,
+      // @deletion-target 7.0.0 _platform to be made required.
+      private _platform?: Platform) {
     super(_elementRef);
 
     this._labelOptions = labelOptions ? labelOptions : {};
@@ -250,12 +249,10 @@ export class MatFormField extends _MatFormFieldMixinBase
       this._changeDetectorRef.markForCheck();
     });
 
-    let ngControl = this._control.ngControl;
-    if (ngControl && ngControl.valueChanges) {
-      ngControl.valueChanges.subscribe(() => {
-        this._changeDetectorRef.markForCheck();
-      });
-    }
+    // Run change detection if the value, prefix, or suffix changes.
+    const valueChanges = this._control.ngControl && this._control.ngControl.valueChanges || EMPTY;
+    merge(valueChanges, this._prefixChildren.changes, this._suffixChildren.changes)
+        .subscribe(() => this._changeDetectorRef.markForCheck());
 
     // Re-validate when the number of hints changes.
     this._hintChildren.changes.pipe(startWith(null)).subscribe(() => {
@@ -300,8 +297,7 @@ export class MatFormField extends _MatFormFieldMixinBase
   }
 
   _shouldLabelFloat() {
-    return this._canLabelFloat && (this._control.shouldLabelFloat ||
-        this._control.shouldPlaceholderFloat || this._shouldAlwaysFloat);
+    return this._canLabelFloat && (this._control.shouldLabelFloat || this._shouldAlwaysFloat);
   }
 
   _hideControlPlaceholder() {
@@ -419,6 +415,11 @@ export class MatFormField extends _MatFormFieldMixinBase
    */
   updateOutlineGap() {
     if (this.appearance === 'outline' && this._label && this._label.nativeElement.children.length) {
+      if (this._platform && !this._platform.isBrowser) {
+        // getBoundingClientRect isn't available on the server.
+        return;
+      }
+
       const containerStart = this._getStartEnd(
           this._connectionContainerRef.nativeElement.getBoundingClientRect());
       const labelStart = this._getStartEnd(

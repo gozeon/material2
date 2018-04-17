@@ -5,6 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+
 import {Platform, supportsPassiveEventListeners} from '@angular/cdk/platform';
 import {
   Directive,
@@ -15,13 +16,9 @@ import {
   OnDestroy,
   Optional,
   Output,
-  Renderer2,
   SkipSelf,
 } from '@angular/core';
-import {Observable} from 'rxjs/Observable';
-import {of as observableOf} from 'rxjs/observable/of';
-import {Subject} from 'rxjs/Subject';
-import {Subscription} from 'rxjs/Subscription';
+import {of as observableOf, Observable, Subject, Subscription} from 'rxjs';
 
 
 // This is the value used by AngularJS Material. Through trial and error (on iPhone 6S) they found
@@ -40,7 +37,7 @@ type MonitoredElementInfo = {
 
 
 /** Monitors mouse and keyboard events to determine the cause of focus events. */
-@Injectable()
+@Injectable({providedIn: 'root'})
 export class FocusMonitor implements OnDestroy {
   /** The focus origin that the next focus event is a result of. */
   private _origin: FocusOrigin = null;
@@ -75,30 +72,13 @@ export class FocusMonitor implements OnDestroy {
   constructor(private _ngZone: NgZone, private _platform: Platform) {}
 
   /**
-   * @docs-private
-   * @deprecated renderer param no longer needed.
-   * @deletion-target 6.0.0
-   */
-  monitor(element: HTMLElement, renderer: Renderer2, checkChildren: boolean):
-      Observable<FocusOrigin>;
-  /**
    * Monitors focus on an element and applies appropriate CSS classes.
    * @param element The element to monitor
    * @param checkChildren Whether to count the element as focused when its children are focused.
    * @returns An observable that emits when the focus state of the element changes.
    *     When the element is blurred, null will be emitted.
    */
-  monitor(element: HTMLElement, checkChildren?: boolean): Observable<FocusOrigin>;
-  monitor(
-      element: HTMLElement,
-      renderer?: Renderer2 | boolean,
-      checkChildren?: boolean): Observable<FocusOrigin> {
-    // TODO(mmalerba): clean up after deprecated signature is removed.
-    if (!(renderer instanceof Renderer2)) {
-      checkChildren = renderer;
-    }
-    checkChildren = !!checkChildren;
-
+  monitor(element: HTMLElement, checkChildren: boolean = false): Observable<FocusOrigin> {
     // Do nothing if we're not on the browser platform.
     if (!this._platform.isBrowser) {
       return observableOf(null);
@@ -160,7 +140,11 @@ export class FocusMonitor implements OnDestroy {
    */
   focusVia(element: HTMLElement, origin: FocusOrigin): void {
     this._setOriginForCurrentEventQueue(origin);
-    element.focus();
+
+    // `focus` isn't available on the server
+    if (typeof element.focus === 'function') {
+      element.focus();
+    }
   }
 
   ngOnDestroy() {
@@ -260,8 +244,10 @@ export class FocusMonitor implements OnDestroy {
    * @param origin The origin to set.
    */
   private _setOriginForCurrentEventQueue(origin: FocusOrigin): void {
-    this._origin = origin;
-    this._originTimeoutId = setTimeout(() => this._origin = null, 0);
+    this._ngZone.runOutsideAngular(() => {
+      this._origin = origin;
+      this._originTimeoutId = setTimeout(() => this._origin = null, 0);
+    });
   }
 
   /**
@@ -398,13 +384,13 @@ export class CdkMonitorFocus implements OnDestroy {
   }
 }
 
-/** @docs-private */
+/** @docs-private @deprecated @deletion-target 7.0.0 */
 export function FOCUS_MONITOR_PROVIDER_FACTORY(
     parentDispatcher: FocusMonitor, ngZone: NgZone, platform: Platform) {
   return parentDispatcher || new FocusMonitor(ngZone, platform);
 }
 
-/** @docs-private */
+/** @docs-private @deprecated @deletion-target 7.0.0 */
 export const FOCUS_MONITOR_PROVIDER = {
   // If there is already a FocusMonitor available, use that. Otherwise, provide a new one.
   provide: FocusMonitor,

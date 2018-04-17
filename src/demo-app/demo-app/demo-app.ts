@@ -20,7 +20,6 @@ import {Component, ElementRef, ViewEncapsulation} from '@angular/core';
   selector: 'entry-app',
   template: '<router-outlet></router-outlet>',
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
 })
 export class EntryApp {}
 
@@ -45,7 +44,6 @@ export class Home {}
   templateUrl: 'demo-app.html',
   styleUrls: ['demo-app.css'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
 })
 export class DemoApp {
   dark = false;
@@ -56,6 +54,8 @@ export class DemoApp {
     {name: 'Button Toggle', route: '/button-toggle'},
     {name: 'Button', route: '/button'},
     {name: 'Card', route: '/card'},
+    {name: 'Chips', route: '/chips'},
+    {name: 'Connected Overlay', route: '/connected-overlay'},
     {name: 'Checkbox', route: '/checkbox'},
     {name: 'Chips', route: '/chips'},
     {name: 'Datepicker', route: '/datepicker'},

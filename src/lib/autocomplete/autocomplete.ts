@@ -21,7 +21,6 @@ import {
   Output,
   InjectionToken,
   Inject,
-  Optional,
 } from '@angular/core';
 import {
   MatOption,
@@ -62,7 +61,10 @@ export interface MatAutocompleteDefaultOptions {
 
 /** Injection token to be used to override the default options for `mat-autocomplete`. */
 export const MAT_AUTOCOMPLETE_DEFAULT_OPTIONS =
-    new InjectionToken<MatAutocompleteDefaultOptions>('mat-autocomplete-default-options');
+    new InjectionToken<MatAutocompleteDefaultOptions>('mat-autocomplete-default-options', {
+      providedIn: 'root',
+      factory: () => ({autoActiveFirstOption: false}),
+    });
 
 
 @Component({
@@ -71,7 +73,6 @@ export const MAT_AUTOCOMPLETE_DEFAULT_OPTIONS =
   templateUrl: 'autocomplete.html',
   styleUrls: ['autocomplete.css'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
   exportAs: 'matAutocomplete',
   inputs: ['disableRipple'],
@@ -151,16 +152,10 @@ export class MatAutocomplete extends _MatAutocompleteMixinBase implements AfterC
   constructor(
     private _changeDetectorRef: ChangeDetectorRef,
     private _elementRef: ElementRef,
-
-    // @deletion-target Turn into required param in 6.0.0
-    @Optional() @Inject(MAT_AUTOCOMPLETE_DEFAULT_OPTIONS)
-        defaults?: MatAutocompleteDefaultOptions) {
+    @Inject(MAT_AUTOCOMPLETE_DEFAULT_OPTIONS) defaults: MatAutocompleteDefaultOptions) {
     super();
 
-    this._autoActiveFirstOption = defaults &&
-        typeof defaults.autoActiveFirstOption !== 'undefined' ?
-            defaults.autoActiveFirstOption :
-            false;
+    this._autoActiveFirstOption = !!defaults.autoActiveFirstOption;
   }
 
   ngAfterContentInit() {

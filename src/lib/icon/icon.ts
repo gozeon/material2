@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {take} from 'rxjs/operators/take';
+import {take} from 'rxjs/operators';
 import {
   Attribute,
   ChangeDetectionStrategy,
@@ -19,6 +19,7 @@ import {
   ViewEncapsulation,
 } from '@angular/core';
 import {CanColor, mixinColor} from '@angular/material/core';
+import {coerceBooleanProperty} from '@angular/cdk/coercion';
 import {MatIconRegistry} from './icon-registry';
 
 
@@ -67,12 +68,25 @@ export const _MatIconMixinBase = mixinColor(MatIconBase);
   host: {
     'role': 'img',
     'class': 'mat-icon',
+    '[class.mat-icon-inline]': 'inline',
   },
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MatIcon extends _MatIconMixinBase implements OnChanges, OnInit, CanColor {
+
+  /**
+   * Whether the icon should be inlined, automatically sizing the icon to match the font size of
+   * the element the icon is contained in.
+   */
+  @Input()
+  get inline(): boolean {
+    return this._inline;
+  }
+  set inline(inline: boolean) {
+    this._inline = coerceBooleanProperty(inline);
+  }
+  private _inline: boolean = false;
 
   /** Name of the icon in the SVG icon set. */
   @Input() svgIcon: string;

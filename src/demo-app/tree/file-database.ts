@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 import {Injectable} from '@angular/core';
-import {BehaviorSubject} from 'rxjs/BehaviorSubject';
+import {BehaviorSubject} from 'rxjs';
 
 /**
  * File node data with nested structure.
@@ -29,7 +29,7 @@ export class FileFlatNode {
 /**
  * The file structure tree data in string. The data could be parsed into a Json object
  */
-const TREE_DATA = `{"Tina":
+const TREE_DATA = `
   {
     "Documents": {
       "angular": {
@@ -64,7 +64,7 @@ const TREE_DATA = `{"Tina":
         "Calendar": "app",
         "Webstorm": "app"
     }
-}}`;
+}`;
 
 /**
  * File database, it can build a tree structured Json object from string.

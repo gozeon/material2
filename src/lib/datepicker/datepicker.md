@@ -53,15 +53,16 @@ year containing the `startAt` date.
 
 #### Watching the views for changes on selected years and months
 
-When a year or a month is selected in `multi-year` and `year` views respecively, the `yearSelected`
+When a year or a month is selected in `multi-year` and `year` views respectively, the `yearSelected`
 and `monthSelected` outputs emit a normalized date representing the chosen year or month. By
-"normalized" we mean that the dates representing a year will have their month set to January and
+"normalized" we mean that the dates representing years will have their month set to January and
 their day set to the 1st. Dates representing months will have their day set to the 1st of the
 month. For example, if `<mat-datepicker>` is configured to work with javascript native Date
 objects, the `yearSelected` will emit `new Date(2017, 0, 1)` if the user selects 2017 in
-`multi-year` view. Similarly, `monthSelected` will emit `new Date(2017, 1, 0)` if the user
+`multi-year` view. Similarly, `monthSelected` will emit `new Date(2017, 1, 1)` if the user
 selects **February** in `year` view and the current date value of the connected `<input>` was
-something like `new Date(2017, MM, dd)` (the month and day are irrelevant in this case).
+set to something like `new Date(2017, MM, dd)` when the calendar was opened (the month and day are
+irrelevant in this case).
 
 Notice that the emitted value does not affect the current value in the connected `<input>`, which
 is only bound to the selection made in the `month` view. So if the end user closes the calendar 
@@ -98,6 +99,14 @@ As with other types of `<input>`, the datepicker works with `@angular/forms` dir
 `formGroup`, `formControl`, `ngModel`, etc.
 
 <!-- example(datepicker-value) -->
+
+### Changing the datepicker colors
+
+The datepicker popup will automatically inherit the color palette (`primary`, `accent`, or `warn`)
+from the `mat-form-field` it is attached to. If you would like to specify a different palette for
+the popup you can do so by setting the `color` property on `mat-datepicker`.
+
+<!-- example(datepicker-color) -->
 
 ### Date validation
 
@@ -277,6 +286,20 @@ export class MyApp {}
 ```
 
 <!-- example(datepicker-formats) -->
+
+#### Customizing the calendar header
+
+The header section of the calendar (the part containing the view switcher and previous and next
+buttons) can be replaced with a custom component if desired. This is accomplished using the
+`calendarHeaderComponent` property of `<mat-datepicker>`. It takes a component class and constructs
+an instance of the component to use as the header.
+
+In order to interact with the calendar in your custom header component, you can inject the parent
+`MatCalendar` in the constructor. To make sure your header stays in sync with the calendar,
+subscribe to the `stateChanges` observable of the calendar and mark your header component for change
+detection.
+
+<!-- example(datepicker-custom-header) -->
 
 #### Localizing labels and messages
 

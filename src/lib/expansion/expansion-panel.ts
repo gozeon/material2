@@ -7,10 +7,16 @@
  */
 
 import {AnimationEvent} from '@angular/animations';
+import {CdkAccordionItem} from '@angular/cdk/accordion';
+import {coerceBooleanProperty} from '@angular/cdk/coercion';
+import {UniqueSelectionDispatcher} from '@angular/cdk/collections';
+import {TemplatePortal} from '@angular/cdk/portal';
 import {
+  AfterContentInit,
   ChangeDetectionStrategy,
   ChangeDetectorRef,
   Component,
+  ContentChild,
   Directive,
   Host,
   Input,
@@ -18,22 +24,15 @@ import {
   OnDestroy,
   Optional,
   SimpleChanges,
-  ViewEncapsulation,
   ViewContainerRef,
-  AfterContentInit,
-  ContentChild,
+  ViewEncapsulation,
 } from '@angular/core';
-import {CdkAccordionItem} from '@angular/cdk/accordion';
-import {UniqueSelectionDispatcher} from '@angular/cdk/collections';
-import {TemplatePortal} from '@angular/cdk/portal';
-import {Subject} from 'rxjs/Subject';
-import {take} from 'rxjs/operators/take';
-import {filter} from 'rxjs/operators/filter';
-import {startWith} from 'rxjs/operators/startWith';
+import {Subject} from 'rxjs';
+import {filter, startWith, take} from 'rxjs/operators';
 import {MatAccordion} from './accordion';
-import {coerceBooleanProperty} from '@angular/cdk/coercion';
-import {MatExpansionPanelContent} from './expansion-panel-content';
 import {matExpansionAnimations} from './expansion-animations';
+import {MatExpansionPanelContent} from './expansion-panel-content';
+
 
 /** MatExpansionPanel's states. */
 export type MatExpansionPanelState = 'expanded' | 'collapsed';
@@ -45,7 +44,7 @@ let uniqueId = 0;
  * `<mat-expansion-panel>`
  *
  * This component can be used as a single element to show expandable content, or as one of
- * multiple children of an element with the MdAccordion directive attached.
+ * multiple children of an element with the MatAccordion directive attached.
  */
 @Component({
   moduleId: module.id,
@@ -54,7 +53,6 @@ let uniqueId = 0;
   exportAs: 'matExpansionPanel',
   templateUrl: './expansion-panel.html',
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
   inputs: ['disabled', 'expanded'],
   outputs: ['opened', 'closed', 'expandedChange'],

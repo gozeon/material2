@@ -45,7 +45,7 @@ import {
   mixinDisabled,
   mixinTabIndex,
 } from '@angular/material/core';
-import {Subscription} from 'rxjs/Subscription';
+import {Subscription} from 'rxjs';
 
 /**
  * Visually, a 30px separation between tick marks looks best. This is very subjective but it is
@@ -131,7 +131,6 @@ export const _MatSliderMixinBase =
   styleUrls: ['slider.css'],
   inputs: ['disabled', 'color', 'tabIndex'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MatSlider extends _MatSliderMixinBase
@@ -195,14 +194,6 @@ export class MatSlider extends _MatSliderMixinBase
   private _thumbLabel: boolean = false;
 
   /**
-   * @deprecated
-   * @deletion-target 6.0.0
-   */
-  @Input('thumb-label')
-  get _thumbLabelDeprecated(): boolean { return this._thumbLabel; }
-  set _thumbLabelDeprecated(value) { this._thumbLabel = value; }
-
-  /**
    * How often to show ticks. Relative to the step so that a tick always appears on a step.
    * Ex: Tick interval of 4 with a step of 3 will draw a tick every 4 steps (every 12 values).
    */
@@ -218,14 +209,6 @@ export class MatSlider extends _MatSliderMixinBase
     }
   }
   private _tickInterval: 'auto' | number = 0;
-
-  /**
-   * @deprecated
-   * @deletion-target 6.0.0
-   */
-  @Input('tick-interval')
-  get _tickIntervalDeprecated() { return this.tickInterval; }
-  set _tickIntervalDeprecated(v) { this.tickInterval = v; }
 
   /** Value of the slider. */
   @Input()
@@ -247,6 +230,13 @@ export class MatSlider extends _MatSliderMixinBase
   }
   private _value: number | null = null;
 
+  /**
+   * Function that will be used to format the value before it is displayed
+   * in the thumb label. Can be used to format very large number in order
+   * for them to fit into the slider thumb.
+   */
+  @Input() displayWith: (value: number | null) => string | number;
+
   /** Whether the slider is vertical. */
   @Input()
   get vertical(): boolean { return this._vertical; }
@@ -263,6 +253,10 @@ export class MatSlider extends _MatSliderMixinBase
 
   /** The value to be used for display purposes. */
   get displayValue(): string | number {
+    if (this.displayWith) {
+      return this.displayWith(this.value);
+    }
+
     // Note that this could be improved further by rounding something like 0.999 to 1 or
     // 0.899 to 0.9, however it is very performance sensitive, because it gets called on
     // every change detection cycle.
@@ -625,16 +619,29 @@ export class MatSlider extends _MatSliderMixinBase
 
     // The exact value is calculated from the event and used to find the closest snap value.
     let percent = this._clamp((posComponent - offset) / size);
+
     if (this._invertMouseCoords) {
       percent = 1 - percent;
     }
-    let exactValue = this._calculateValue(percent);
 
-    // This calculation finds the closest step by finding the closest whole number divisible by the
-    // step relative to the min.
-    let closestValue = Math.round((exactValue - this.min) / this.step) * this.step + this.min;
-    // The value needs to snap to the min and max.
-    this.value = this._clamp(closestValue, this.min, this.max);
+    // Since the steps may not divide cleanly into the max value, if the user
+    // slid to 0 or 100 percent, we jump to the min/max value. This approach
+    // is slightly more intuitive than using `Math.ceil` below, because it
+    // follows the user's pointer closer.
+    if (percent === 0) {
+      this.value = this.min;
+    } else if (percent === 1) {
+      this.value = this.max;
+    } else {
+      let exactValue = this._calculateValue(percent);
+
+      // This calculation finds the closest step by finding the closest
+      // whole number divisible by the step relative to the min.
+      let closestValue = Math.round((exactValue - this.min) / this.step) * this.step + this.min;
+
+      // The value needs to snap to the min and max.
+      this.value = this._clamp(closestValue, this.min, this.max);
+    }
   }
 
   /** Emits a change event if the current value is different from the last emitted value. */

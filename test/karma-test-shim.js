@@ -69,6 +69,7 @@ System.config({
     '@angular/cdk/stepper': 'dist/packages/cdk/stepper/index.js',
     '@angular/cdk/table': 'dist/packages/cdk/table/index.js',
     '@angular/cdk/testing': 'dist/packages/cdk/testing/index.js',
+    '@angular/cdk/text-field': 'dist/packages/cdk/text-field/index.js',
     '@angular/cdk/tree': 'dist/packages/cdk/tree/index.js',
 
     '@angular/material/autocomplete': 'dist/packages/material/autocomplete/index.js',
@@ -110,6 +111,7 @@ System.config({
   packages: {
     // Thirdparty barrels.
     'rxjs': {main: 'index'},
+    'rxjs/operators': {main: 'index'},
 
     // Set the default extension for the root package, because otherwise the demo-app can't
     // be built within the production mode. Due to missing file extensions.

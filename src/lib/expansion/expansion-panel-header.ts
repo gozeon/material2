@@ -8,7 +8,6 @@
 
 import {FocusMonitor} from '@angular/cdk/a11y';
 import {ENTER, SPACE} from '@angular/cdk/keycodes';
-import {filter} from 'rxjs/operators/filter';
 import {
   ChangeDetectionStrategy,
   ChangeDetectorRef,
@@ -20,10 +19,10 @@ import {
   OnDestroy,
   ViewEncapsulation,
 } from '@angular/core';
-import {merge} from 'rxjs/observable/merge';
-import {Subscription} from 'rxjs/Subscription';
-import {MatExpansionPanel} from './expansion-panel';
+import {merge, Subscription} from 'rxjs';
+import {filter} from 'rxjs/operators';
 import {matExpansionAnimations} from './expansion-animations';
+import {MatExpansionPanel} from './expansion-panel';
 
 
 /**
@@ -37,7 +36,6 @@ import {matExpansionAnimations} from './expansion-animations';
   styleUrls: ['./expansion-panel-header.css'],
   templateUrl: './expansion-panel-header.html',
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
   animations: [
     matExpansionAnimations.indicatorRotate,

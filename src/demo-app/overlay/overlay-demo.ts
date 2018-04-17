@@ -16,8 +16,7 @@ import {
   ViewContainerRef,
   ViewEncapsulation,
 } from '@angular/core';
-import {filter} from 'rxjs/operators/filter';
-import {tap} from 'rxjs/operators/tap';
+import {filter, tap} from 'rxjs/operators';
 
 
 @Component({
@@ -26,7 +25,6 @@ import {tap} from 'rxjs/operators/tap';
   templateUrl: 'overlay-demo.html',
   styleUrls: ['overlay-demo.css'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
 })
 export class OverlayDemo {
   nextPosition: number = 0;

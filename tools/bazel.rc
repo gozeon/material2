@@ -36,6 +36,10 @@ test --test_output=errors
 build --experimental_ui
 test --experimental_ui
 
+# Configures script to do version stamping.
+# See https://docs.bazel.build/versions/master/user-manual.html#flag--workspace_status_command
+build --workspace_status_command=./tools/bazel-stamp-vars.sh
+
 ###############################
 # Typescript / Angular / Sass #
 ###############################

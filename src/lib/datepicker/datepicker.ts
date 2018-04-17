@@ -8,30 +8,33 @@
 
 import {Directionality} from '@angular/cdk/bidi';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
-import {ESCAPE} from '@angular/cdk/keycodes';
+import {ESCAPE, UP_ARROW} from '@angular/cdk/keycodes';
 import {
+  FlexibleConnectedPositionStrategy,
   Overlay,
   OverlayConfig,
   OverlayRef,
   PositionStrategy,
-  RepositionScrollStrategy,
   ScrollStrategy,
 } from '@angular/cdk/overlay';
-import {ComponentPortal} from '@angular/cdk/portal';
-import {take} from 'rxjs/operators/take';
-import {filter} from 'rxjs/operators/filter';
+import {ComponentPortal, ComponentType} from '@angular/cdk/portal';
+import {DOCUMENT} from '@angular/common';
+import {take, filter} from 'rxjs/operators';
 import {
   AfterContentInit,
   ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ComponentRef,
   ElementRef,
   EventEmitter,
   Inject,
+  inject,
   InjectionToken,
   Input,
   NgZone,
   OnDestroy,
+  OnInit,
   Optional,
   Output,
   ViewChild,
@@ -40,34 +43,24 @@ import {
 } from '@angular/core';
 import {CanColor, DateAdapter, mixinColor, ThemePalette} from '@angular/material/core';
 import {MatDialog, MatDialogRef} from '@angular/material/dialog';
-import {DOCUMENT} from '@angular/common';
-import {Subject} from 'rxjs/Subject';
-import {Subscription} from 'rxjs/Subscription';
-import {merge} from 'rxjs/observable/merge';
+import {merge, Subject, Subscription} from 'rxjs';
 import {createMissingDateImplError} from './datepicker-errors';
 import {MatDatepickerInput} from './datepicker-input';
 import {MatCalendar} from './calendar';
-
+import {matDatepickerAnimations} from './datepicker-animations';
 
 /** Used to generate a unique ID for each datepicker instance. */
 let datepickerUid = 0;
 
 /** Injection token that determines the scroll handling while the calendar is open. */
 export const MAT_DATEPICKER_SCROLL_STRATEGY =
-    new InjectionToken<() => ScrollStrategy>('mat-datepicker-scroll-strategy');
-
-/** @docs-private */
-export function MAT_DATEPICKER_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay: Overlay):
-    () => RepositionScrollStrategy {
-  return () => overlay.scrollStrategies.reposition();
-}
-
-/** @docs-private */
-export const MAT_DATEPICKER_SCROLL_STRATEGY_PROVIDER = {
-  provide: MAT_DATEPICKER_SCROLL_STRATEGY,
-  deps: [Overlay],
-  useFactory: MAT_DATEPICKER_SCROLL_STRATEGY_PROVIDER_FACTORY,
-};
+    new InjectionToken<() => ScrollStrategy>('mat-datepicker-scroll-strategy', {
+      providedIn: 'root',
+      factory: () => {
+        const overlay = inject(Overlay);
+        return () => overlay.scrollStrategies.reposition();
+      }
+    });
 
 // Boilerplate for applying mixins to MatDatepickerContent.
 /** @docs-private */
@@ -90,22 +83,59 @@ export const _MatDatepickerContentMixinBase = mixinColor(MatDatepickerContentBas
   styleUrls: ['datepicker-content.css'],
   host: {
     'class': 'mat-datepicker-content',
+    '[@transformPanel]': '"enter"',
     '[class.mat-datepicker-content-touch]': 'datepicker.touchUi',
+    '[class.mat-datepicker-content-above]': '_isAbove',
   },
+  animations: [
+    matDatepickerAnimations.transformPanel,
+    matDatepickerAnimations.fadeInCalendar,
+  ],
   exportAs: 'matDatepickerContent',
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
   inputs: ['color'],
 })
 export class MatDatepickerContent<D> extends _MatDatepickerContentMixinBase
-  implements AfterContentInit, CanColor {
-  datepicker: MatDatepicker<D>;
+  implements AfterContentInit, CanColor, OnInit, OnDestroy {
 
+  /** Subscription to changes in the overlay's position. */
+  private _positionChange: Subscription|null;
+
+  /** Reference to the internal calendar component. */
   @ViewChild(MatCalendar) _calendar: MatCalendar<D>;
 
-  constructor(elementRef: ElementRef, private _ngZone: NgZone) {
+  /** Reference to the datepicker that created the overlay. */
+  datepicker: MatDatepicker<D>;
+
+  /** Whether the datepicker is above or below the input. */
+  _isAbove: boolean;
+
+  constructor(
+    elementRef: ElementRef,
+    private _changeDetectorRef: ChangeDetectorRef,
+    private _ngZone: NgZone) {
     super(elementRef);
+  }
+
+  ngOnInit() {
+    if (!this.datepicker._popupRef || this._positionChange) {
+      return;
+    }
+
+    const positionStrategy =
+      this.datepicker._popupRef.getConfig().positionStrategy! as FlexibleConnectedPositionStrategy;
+
+    this._positionChange = positionStrategy.positionChanges.subscribe(change => {
+      const isAbove = change.connectionPair.overlayY === 'bottom';
+
+      if (isAbove !== this._isAbove) {
+        this._ngZone.run(() => {
+          this._isAbove = isAbove;
+          this._changeDetectorRef.markForCheck();
+        });
+      }
+    });
   }
 
   ngAfterContentInit() {
@@ -119,6 +149,13 @@ export class MatDatepickerContent<D> extends _MatDatepickerContentMixinBase
         this._elementRef.nativeElement.querySelector('.mat-calendar-body-active').focus();
       });
     });
+  }
+
+  ngOnDestroy() {
+    if (this._positionChange) {
+      this._positionChange.unsubscribe();
+      this._positionChange = null;
+    }
   }
 }
 
@@ -134,9 +171,11 @@ export class MatDatepickerContent<D> extends _MatDatepickerContentMixinBase
   exportAs: 'matDatepicker',
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
 })
 export class MatDatepicker<D> implements OnDestroy, CanColor {
+  /** An input indicating the type of the custom header component for the calendar, if set. */
+  @Input() calendarHeaderComponent: ComponentType<any>;
+
   /** The date to open the calendar to initially. */
   @Input()
   get startAt(): D | null {
@@ -153,7 +192,15 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
   @Input() startView: 'month' | 'year' = 'month';
 
   /** Color palette to use on the datepicker's calendar. */
-  @Input() color: ThemePalette;
+  @Input()
+  get color(): ThemePalette {
+    return this._color ||
+        (this._datepickerInput ? this._datepickerInput._getThemePalette() : undefined);
+  }
+  set color(value: ThemePalette) {
+    this._color = value;
+  }
+  _color: ThemePalette;
 
   /**
    * Whether the calendar UI is in touch mode. In touch mode the calendar opens in a dialog rather
@@ -181,13 +228,6 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
     }
   }
   private _disabled: boolean;
-
-  /**
-   * Emits new selected date when selected date changes.
-   * @deprecated Switch to the `dateChange` and `dateInput` binding on the input element.
-   * @deletion-target 6.0.0
-   */
-  @Output() readonly selectedChanged: EventEmitter<D> = new EventEmitter<D>();
 
   /**
    * Emits selected year in multiyear view.
@@ -240,7 +280,7 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
   }
 
   /** A reference to the overlay when the calendar is opened as a popup. */
-  private _popupRef: OverlayRef;
+  _popupRef: OverlayRef;
 
   /** A reference to the dialog when the calendar is opened as a dialog. */
   private _dialogRef: MatDialogRef<MatDatepickerContent<D>> | null;
@@ -262,6 +302,9 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
 
   /** Emits when the datepicker is disabled. */
   readonly _disabledChange = new Subject<boolean>();
+
+  /** Emits new selected date when selected date changes. */
+  readonly _selectedChanged = new Subject<D>();
 
   constructor(private _dialog: MatDialog,
               private _overlay: Overlay,
@@ -292,7 +335,7 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
     let oldValue = this._selected;
     this._selected = date;
     if (!this._dateAdapter.sameDate(oldValue, this._selected)) {
-      this.selectedChanged.emit(date);
+      this._selectedChanged.next(date);
     }
   }
 
@@ -379,14 +422,13 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
   /** Open the calendar as a dialog. */
   private _openAsDialog(): void {
     this._dialogRef = this._dialog.open<MatDatepickerContent<D>>(MatDatepickerContent, {
-      direction: this._dir ? this._dir.value : 'ltr',
+      direction: this._getDirection(),
       viewContainerRef: this._viewContainerRef,
       panelClass: 'mat-datepicker-dialog',
     });
-    if (this._dialogRef) {
-      this._dialogRef.afterClosed().subscribe(() => this.close());
-      this._dialogRef.componentInstance.datepicker = this;
-    }
+
+    this._dialogRef.afterClosed().subscribe(() => this.close());
+    this._dialogRef.componentInstance.datepicker = this;
     this._setColor();
   }
 
@@ -402,6 +444,7 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
     }
 
     if (!this._popupRef.hasAttached()) {
+      this._popupRef.setDirection(this._getDirection());
       this._popupComponentRef = this._popupRef.attach(this._calendarPortal);
       this._popupComponentRef.instance.datepicker = this;
       this._setColor();
@@ -419,7 +462,7 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
       positionStrategy: this._createPopupPositionStrategy(),
       hasBackdrop: true,
       backdropClass: 'mat-overlay-transparent-backdrop',
-      direction: this._dir ? this._dir.value : 'ltr',
+      direction: this._getDirection(),
       scrollStrategy: this._scrollStrategy(),
       panelClass: 'mat-datepicker-popup',
     });
@@ -429,29 +472,47 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
     merge(
       this._popupRef.backdropClick(),
       this._popupRef.detachments(),
-      this._popupRef.keydownEvents().pipe(filter(event => event.keyCode === ESCAPE))
+      this._popupRef.keydownEvents().pipe(filter(event => {
+        // Closing on alt + up is only valid when there's an input associated with the datepicker.
+        return event.keyCode === ESCAPE ||
+               (this._datepickerInput && event.altKey && event.keyCode === UP_ARROW);
+      }))
     ).subscribe(() => this.close());
   }
 
   /** Create the popup PositionStrategy. */
   private _createPopupPositionStrategy(): PositionStrategy {
     return this._overlay.position()
-      .connectedTo(this._datepickerInput.getConnectedOverlayOrigin(),
-        {originX: 'start', originY: 'bottom'},
-        {overlayX: 'start', overlayY: 'top'}
-      )
-      .withFallbackPosition(
-        {originX: 'start', originY: 'top'},
-        {overlayX: 'start', overlayY: 'bottom'},
-      )
-      .withFallbackPosition(
-        {originX: 'end', originY: 'bottom'},
-        {overlayX: 'end', overlayY: 'top'}
-      )
-      .withFallbackPosition(
-        {originX: 'end', originY: 'top'},
-        {overlayX: 'end', overlayY: 'bottom'},
-      );
+      .flexibleConnectedTo(this._datepickerInput.getPopupConnectionElementRef())
+      .withFlexibleDimensions(false)
+      .withViewportMargin(8)
+      .withPush(false)
+      .withPositions([
+        {
+          originX: 'start',
+          originY: 'bottom',
+          overlayX: 'start',
+          overlayY: 'top'
+        },
+        {
+          originX: 'start',
+          originY: 'top',
+          overlayX: 'start',
+          overlayY: 'bottom'
+        },
+        {
+          originX: 'end',
+          originY: 'bottom',
+          overlayX: 'end',
+          overlayY: 'top'
+        },
+        {
+          originX: 'end',
+          originY: 'top',
+          overlayX: 'end',
+          overlayY: 'bottom'
+        }
+      ]);
   }
 
   /**
@@ -464,15 +525,17 @@ export class MatDatepicker<D> implements OnDestroy, CanColor {
 
   /** Passes the current theme color along to the calendar overlay. */
   private _setColor(): void {
-    const input = this._datepickerInput;
-    const color = this.color || (input ? input._getThemePalette() : undefined);
-
+    const color = this.color;
     if (this._popupComponentRef) {
       this._popupComponentRef.instance.color = color;
     }
-
     if (this._dialogRef) {
       this._dialogRef.componentInstance.color = color;
     }
+  }
+
+  /** Returns the layout direction of the datepicker. */
+  private _getDirection() {
+    return this._dir ? this._dir.value : 'ltr';
   }
 }

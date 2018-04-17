@@ -14,7 +14,7 @@ import {CDK_TABLE_TEMPLATE, CdkTable} from '@angular/cdk/table';
  */
 @Component({
   moduleId: module.id,
-  selector: 'mat-table',
+  selector: 'mat-table, table[mat-table]',
   exportAs: 'matTable',
   template: CDK_TABLE_TEMPLATE,
   styleUrls: ['table.css'],
@@ -22,7 +22,6 @@ import {CDK_TABLE_TEMPLATE, CdkTable} from '@angular/cdk/table';
     'class': 'mat-table',
   },
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MatTable<T> extends CdkTable<T> { }

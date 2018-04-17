@@ -30,7 +30,7 @@ import {
 import {BreakpointObserver, Breakpoints} from '@angular/cdk/layout';
 import {MatBottomSheetConfig} from './bottom-sheet-config';
 import {matBottomSheetAnimations} from './bottom-sheet-animations';
-import {Subscription} from 'rxjs/Subscription';
+import {Subscription} from 'rxjs';
 import {DOCUMENT} from '@angular/common';
 import {FocusTrap, FocusTrapFactory} from '@angular/cdk/a11y';
 
@@ -47,7 +47,6 @@ import {FocusTrap, FocusTrapFactory} from '@angular/cdk/a11y';
   styleUrls: ['bottom-sheet-container.css'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   animations: [matBottomSheetAnimations.bottomSheetState],
   host: {
     'class': 'mat-bottom-sheet-container',
@@ -82,6 +81,9 @@ export class MatBottomSheetContainer extends BasePortalOutlet implements OnDestr
 
   /** Server-side rendering-compatible reference to the global document object. */
   private _document: Document;
+
+  /** Whether the component has been destroyed. */
+  private _destroyed: boolean;
 
   constructor(
     private _elementRef: ElementRef,
@@ -122,18 +124,23 @@ export class MatBottomSheetContainer extends BasePortalOutlet implements OnDestr
 
   /** Begin animation of bottom sheet entrance into view. */
   enter(): void {
-    this._animationState = 'visible';
-    this._changeDetectorRef.detectChanges();
+    if (!this._destroyed) {
+      this._animationState = 'visible';
+      this._changeDetectorRef.detectChanges();
+    }
   }
 
   /** Begin animation of the bottom sheet exiting from view. */
   exit(): void {
-    this._animationState = 'hidden';
-    this._changeDetectorRef.markForCheck();
+    if (!this._destroyed) {
+      this._animationState = 'hidden';
+      this._changeDetectorRef.markForCheck();
+    }
   }
 
   ngOnDestroy() {
     this._breakpointSubscription.unsubscribe();
+    this._destroyed = true;
   }
 
   _onAnimationDone(event: AnimationEvent) {

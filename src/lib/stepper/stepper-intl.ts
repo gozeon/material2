@@ -7,11 +7,11 @@
  */
 
 import {Injectable} from '@angular/core';
-import {Subject} from 'rxjs/Subject';
+import {Subject} from 'rxjs';
 
 
 /** Stepper data that is required for internationalization. */
-@Injectable()
+@Injectable({providedIn: 'root'})
 export class MatStepperIntl {
   /**
    * Stream that emits whenever the labels here are changed. Use this to notify

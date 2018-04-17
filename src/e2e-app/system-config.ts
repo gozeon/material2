@@ -50,6 +50,7 @@ System.config({
     '@angular/cdk/tree': 'dist/bundles/cdk-tree.umd.js',
     '@angular/cdk/testing': 'dist/bundles/cdk-testing.umd.js',
     '@angular/material-examples': 'dist/bundles/material-examples.umd.js',
+    '@angular/cdk/text-field': 'dist/bundles/cdk-text-field.umd.js',
 
     '@angular/material/autocomplete': 'dist/bundles/material-autocomplete.umd.js',
     '@angular/material/bottom-sheet': 'dist/bundles/material-bottom-sheet.umd.js',
@@ -89,6 +90,7 @@ System.config({
   packages: {
     // Thirdparty barrels.
     'rxjs': {main: 'index'},
+    'rxjs/operators': {main: 'index'},
 
     // Set the default extension for the root package, because otherwise the demo-app can't
     // be built within the production mode. Due to missing file extensions.

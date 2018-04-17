@@ -5,6 +5,7 @@
  * Use of this source code is governed by an MIT-style license that can be
  * found in the LICENSE file at https://angular.io/license
  */
+
 import {ActiveDescendantKeyManager} from '@angular/cdk/a11y';
 import {Directionality} from '@angular/cdk/bidi';
 import {coerceBooleanProperty} from '@angular/cdk/coercion';
@@ -14,10 +15,10 @@ import {
   END,
   ENTER,
   HOME,
-  SPACE,
-  UP_ARROW,
   LEFT_ARROW,
   RIGHT_ARROW,
+  SPACE,
+  UP_ARROW,
 } from '@angular/cdk/keycodes';
 import {
   CdkConnectedOverlay,
@@ -26,12 +27,6 @@ import {
   ScrollStrategy,
   ViewportRuler,
 } from '@angular/cdk/overlay';
-import {filter} from 'rxjs/operators/filter';
-import {take} from 'rxjs/operators/take';
-import {map} from 'rxjs/operators/map';
-import {switchMap} from 'rxjs/operators/switchMap';
-import {startWith} from 'rxjs/operators/startWith';
-import {takeUntil} from 'rxjs/operators/takeUntil';
 import {
   AfterContentInit,
   Attribute,
@@ -60,34 +55,27 @@ import {
   ViewChild,
   ViewEncapsulation,
 } from '@angular/core';
+import {ControlValueAccessor, FormGroupDirective, NgControl, NgForm} from '@angular/forms';
 import {
-  ControlValueAccessor,
-  FormGroupDirective,
-  NgControl,
-  NgForm
-} from '@angular/forms';
-import {
+  _countGroupLabelsBeforeOption,
+  _getOptionScrollPosition,
   CanDisable,
-  ErrorStateMatcher,
+  CanDisableRipple,
   CanUpdateErrorState,
-  mixinErrorState,
+  ErrorStateMatcher,
   HasTabIndex,
+  MAT_OPTION_PARENT_COMPONENT,
   MatOptgroup,
   MatOption,
   MatOptionSelectionChange,
   mixinDisabled,
-  mixinTabIndex,
-  MAT_OPTION_PARENT_COMPONENT,
   mixinDisableRipple,
-  CanDisableRipple,
-  _countGroupLabelsBeforeOption,
-  _getOptionScrollPosition,
+  mixinErrorState,
+  mixinTabIndex,
 } from '@angular/material/core';
 import {MatFormField, MatFormFieldControl} from '@angular/material/form-field';
-import {Observable} from 'rxjs/Observable';
-import {merge} from 'rxjs/observable/merge';
-import {Subject} from 'rxjs/Subject';
-import {defer} from 'rxjs/observable/defer';
+import {defer, merge, Observable, Subject} from 'rxjs';
+import {filter, map, startWith, switchMap, take, takeUntil} from 'rxjs/operators';
 import {matSelectAnimations} from './select-animations';
 import {
   getMatSelectDynamicMultipleError,
@@ -188,7 +176,6 @@ export class MatSelectTrigger {}
   styleUrls: ['select.css'],
   inputs: ['disabled', 'disableRipple', 'tabIndex'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'role': 'listbox',
@@ -433,42 +420,17 @@ export class MatSelect extends _MatSelectMixinBase implements AfterContentInit, 
    /** Event emitted when the select panel has been toggled. */
    @Output() readonly openedChange: EventEmitter<boolean> = new EventEmitter<boolean>();
 
-   /** Event emitted when the select has been opened. */
-   @Output('opened')
-   get _openedStream(): Observable<void> {
-    return this.openedChange.pipe(filter(o => o), map(() => {}));
-  }
+  /** Event emitted when the select has been opened. */
+  @Output('opened') readonly _openedStream: Observable<void> =
+      this.openedChange.pipe(filter(o => o), map(() => {}));
 
   /** Event emitted when the select has been closed. */
-  @Output('closed')
-  get _closedStream(): Observable<void> {
-    return this.openedChange.pipe(filter(o => !o), map(() => {}));
-  }
-
-  /**
-   * Event emitted when the select has been opened.
-   * @deprecated Use `openedChange` instead.
-   * @deletion-target 6.0.0
-   */
-  @Output() readonly onOpen: Observable<void> = this._openedStream;
-
-  /**
-   * Event emitted when the select has been closed.
-   * @deprecated Use `openedChange` instead.
-   * @deletion-target 6.0.0
-   */
-  @Output() readonly onClose: Observable<void> = this._closedStream;
+  @Output('closed') readonly _closedStream: Observable<void> =
+      this.openedChange.pipe(filter(o => !o), map(() => {}));
 
    /** Event emitted when the selected value has been changed by the user. */
   @Output() readonly selectionChange: EventEmitter<MatSelectChange> =
       new EventEmitter<MatSelectChange>();
-
-  /**
-   * Event emitted when the selected value has been changed by the user.
-   * @deprecated Use `selectionChange` instead.
-   * @deletion-target 6.0.0
-   */
-  @Output() readonly change: EventEmitter<MatSelectChange> = this.selectionChange;
 
   /**
    * Event that emits whenever the raw value of the select changes. This is here primarily
@@ -546,7 +508,7 @@ export class MatSelect extends _MatSelectMixinBase implements AfterContentInit, 
 
   /** Opens the overlay panel. */
   open(): void {
-    if (this.disabled || !this.options || !this.options.length) {
+    if (this.disabled || !this.options || !this.options.length || this._panelOpen) {
       return;
     }
 
@@ -1273,7 +1235,7 @@ export class MatSelect extends _MatSelectMixinBase implements AfterContentInit, 
    * Implemented as part of MatFormFieldControl.
    * @docs-private
    */
-  get shouldPlaceholderFloat(): boolean {
+  get shouldLabelFloat(): boolean {
     return this._panelOpen || !this.empty;
   }
 }

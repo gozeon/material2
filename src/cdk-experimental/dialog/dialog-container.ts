@@ -29,7 +29,7 @@ import {
 } from '@angular/cdk/portal';
 import {FocusTrapFactory} from '@angular/cdk/a11y';
 import {DialogConfig} from './dialog-config';
-import {Subject} from 'rxjs/Subject';
+import {Subject} from 'rxjs';
 
 
 export function throwDialogContentAlreadyAttachedError() {
@@ -47,7 +47,6 @@ export function throwDialogContentAlreadyAttachedError() {
   templateUrl: './dialog-container.html',
   styleUrls: ['dialog-container.css'],
   encapsulation: ViewEncapsulation.None,
-  preserveWhitespaces: false,
   // Using OnPush for dialogs caused some G3 sync issues. Disabled until we can track them down.
   // tslint:disable-next-line:validate-decorators
   changeDetection: ChangeDetectionStrategy.Default,

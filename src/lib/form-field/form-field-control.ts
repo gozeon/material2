@@ -6,7 +6,7 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {Observable} from 'rxjs/Observable';
+import {Observable} from 'rxjs';
 import {NgControl} from '@angular/forms';
 
 
@@ -37,14 +37,7 @@ export abstract class MatFormFieldControl<T> {
   readonly empty: boolean;
 
   /** Whether the `MatFormField` label should try to float. */
-  readonly shouldLabelFloat?: boolean;
-
-  /**
-   * Whether the `MatFormField` placeholder should try to float.
-   * @deprecated Use `shouldLabelFloat` instead.
-   * @deletion-target 6.0.0
-   */
-  readonly shouldPlaceholderFloat?: boolean;
+  readonly shouldLabelFloat: boolean;
 
   /** Whether the control is required. */
   readonly required: boolean;

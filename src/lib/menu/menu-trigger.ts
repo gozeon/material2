@@ -6,27 +6,27 @@
  * found in the LICENSE file at https://angular.io/license
  */
 
-import {isFakeMousedownFromScreenReader} from '@angular/cdk/a11y';
+import {FocusMonitor, FocusOrigin, isFakeMousedownFromScreenReader} from '@angular/cdk/a11y';
 import {Direction, Directionality} from '@angular/cdk/bidi';
 import {LEFT_ARROW, RIGHT_ARROW} from '@angular/cdk/keycodes';
 import {
-  ConnectedPositionStrategy,
+  FlexibleConnectedPositionStrategy,
   HorizontalConnectionPos,
   Overlay,
-  OverlayRef,
   OverlayConfig,
-  RepositionScrollStrategy,
+  OverlayRef,
   ScrollStrategy,
   VerticalConnectionPos,
 } from '@angular/cdk/overlay';
 import {TemplatePortal} from '@angular/cdk/portal';
-import {filter} from 'rxjs/operators/filter';
+import {filter, take} from 'rxjs/operators';
 import {
   AfterContentInit,
   Directive,
   ElementRef,
   EventEmitter,
   Inject,
+  inject,
   InjectionToken,
   Input,
   OnDestroy,
@@ -35,38 +35,27 @@ import {
   Self,
   ViewContainerRef,
 } from '@angular/core';
-import {merge} from 'rxjs/observable/merge';
-import {of as observableOf} from 'rxjs/observable/of';
-import {Subscription} from 'rxjs/Subscription';
+import {Subscription, merge, of as observableOf} from 'rxjs';
 import {MatMenu} from './menu-directive';
 import {throwMatMenuMissingError} from './menu-errors';
 import {MatMenuItem} from './menu-item';
 import {MatMenuPanel} from './menu-panel';
 import {MenuPositionX, MenuPositionY} from './menu-positions';
-import {FocusMonitor, FocusOrigin} from '@angular/cdk/a11y';
 
 /** Injection token that determines the scroll handling while the menu is open. */
 export const MAT_MENU_SCROLL_STRATEGY =
-    new InjectionToken<() => ScrollStrategy>('mat-menu-scroll-strategy');
-
-/** @docs-private */
-export function MAT_MENU_SCROLL_STRATEGY_PROVIDER_FACTORY(overlay: Overlay):
-    () => RepositionScrollStrategy {
-  return () => overlay.scrollStrategies.reposition();
-}
-
-/** @docs-private */
-export const MAT_MENU_SCROLL_STRATEGY_PROVIDER = {
-  provide: MAT_MENU_SCROLL_STRATEGY,
-  deps: [Overlay],
-  useFactory: MAT_MENU_SCROLL_STRATEGY_PROVIDER_FACTORY,
-};
-
-
-// TODO(andrewseguin): Remove the kebab versions in favor of camelCased attribute selectors
+    new InjectionToken<() => ScrollStrategy>('mat-menu-scroll-strategy', {
+      providedIn: 'root',
+      factory: () => {
+        const overlay = inject(Overlay);
+        return () => overlay.scrollStrategies.reposition();
+      }
+    });
 
 /** Default top padding of the menu panel. */
 export const MENU_PANEL_TOP_PADDING = 8;
+
+// TODO(andrewseguin): Remove the kebab versions in favor of camelCased attribute selectors
 
 /**
  * This directive is intended to be used in conjunction with an mat-menu tag.  It is
@@ -95,7 +84,7 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
 
   /**
    * @deprecated
-   * @deletion-target 6.0.0
+   * @deletion-target 7.0.0
    */
   @Input('mat-menu-trigger-for')
   get _deprecatedMatMenuTriggerFor(): MatMenuPanel {
@@ -118,7 +107,7 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
   /**
    * Event emitted when the associated menu is opened.
    * @deprecated Switch to `menuOpened` instead
-   * @deletion-target 6.0.0
+   * @deletion-target 7.0.0
    */
   @Output() readonly onMenuOpen: EventEmitter<void> = this.menuOpened;
 
@@ -128,7 +117,7 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
   /**
    * Event emitted when the associated menu is closed.
    * @deprecated Switch to `menuClosed` instead
-   * @deletion-target 6.0.0
+   * @deletion-target 7.0.0
    */
   @Output() readonly onMenuClose: EventEmitter<void> = this.menuClosed;
 
@@ -140,6 +129,7 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
               @Optional() @Self() private _menuItemInstance: MatMenuItem,
               @Optional() private _dir: Directionality,
               // TODO(crisbeto): make the _focusMonitor required when doing breaking changes.
+              // @deletion-target 7.0.0
               private _focusMonitor?: FocusMonitor) {
 
     if (_menuItemInstance) {
@@ -154,7 +144,7 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
       this._destroyMenu();
 
       // If a click closed the menu, we should close the entire chain of nested menus.
-      if (reason === 'click' && this._parentMenu) {
+      if ((reason === 'click' || reason === 'tab') && this._parentMenu) {
         this._parentMenu.closed.emit(reason);
       }
     });
@@ -238,14 +228,27 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
 
   /** Closes the menu and does the necessary cleanup. */
   private _destroyMenu() {
-    if (this._overlayRef && this.menuOpen) {
-      this._resetMenu();
-      this._closeSubscription.unsubscribe();
-      this._overlayRef.detach();
+    if (!this._overlayRef || !this.menuOpen) {
+      return;
+    }
 
-      if (this.menu instanceof MatMenu) {
-        this.menu._resetAnimation();
+    const menu = this.menu;
+
+    this._resetMenu();
+    this._closeSubscription.unsubscribe();
+    this._overlayRef.detach();
+
+    if (menu instanceof MatMenu) {
+      menu._resetAnimation();
+
+      if (menu.lazyContent) {
+        // Wait for the exit animation to finish before detaching the content.
+        menu._animationDone
+          .pipe(take(1))
+          .subscribe(() => menu.lazyContent!.detach());
       }
+    } else if (menu.lazyContent) {
+      menu.lazyContent.detach();
     }
   }
 
@@ -325,7 +328,7 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
     if (!this._overlayRef) {
       this._portal = new TemplatePortal(this.menu.templateRef, this._viewContainerRef);
       const config = this._getOverlayConfig();
-      this._subscribeToPositions(config.positionStrategy as ConnectedPositionStrategy);
+      this._subscribeToPositions(config.positionStrategy as FlexibleConnectedPositionStrategy);
       this._overlayRef = this._overlay.create(config);
     }
 
@@ -351,8 +354,8 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
    * on the menu based on the new position. This ensures the animation origin is always
    * correct, even if a fallback position is used for the overlay.
    */
-  private _subscribeToPositions(position: ConnectedPositionStrategy): void {
-    position.onPositionChange.subscribe(change => {
+  private _subscribeToPositions(position: FlexibleConnectedPositionStrategy): void {
+    position.positionChanges.subscribe(change => {
       const posX: MenuPositionX = change.connectionPair.overlayX === 'start' ? 'after' : 'before';
       const posY: MenuPositionY = change.connectionPair.overlayY === 'top' ? 'below' : 'above';
 
@@ -365,7 +368,7 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
    * to the trigger.
    * @returns ConnectedPositionStrategy
    */
-  private _getPosition(): ConnectedPositionStrategy {
+  private _getPosition(): FlexibleConnectedPositionStrategy {
     let [originX, originFallbackX]: HorizontalConnectionPos[] =
         this.menu.xPosition === 'before' ? ['end', 'start'] : ['start', 'end'];
 
@@ -388,20 +391,25 @@ export class MatMenuTrigger implements AfterContentInit, OnDestroy {
     }
 
     return this._overlay.position()
-        .connectedTo(this._element, {originX, originY}, {overlayX, overlayY})
-        .withDirection(this.dir)
-        .withOffsetY(offsetY)
-        .withFallbackPosition(
-            {originX: originFallbackX, originY},
-            {overlayX: overlayFallbackX, overlayY})
-        .withFallbackPosition(
-            {originX, originY: originFallbackY},
-            {overlayX, overlayY: overlayFallbackY},
-            undefined, -offsetY)
-        .withFallbackPosition(
-            {originX: originFallbackX, originY: originFallbackY},
-            {overlayX: overlayFallbackX, overlayY: overlayFallbackY},
-            undefined, -offsetY);
+        .flexibleConnectedTo(this._element)
+        .withPositions([
+          {originX, originY, overlayX, overlayY, offsetY},
+          {originX: originFallbackX, originY, overlayX: overlayFallbackX, overlayY, offsetY},
+          {
+            originX,
+            originY: originFallbackY,
+            overlayX,
+            overlayY: overlayFallbackY,
+            offsetY: -offsetY
+          },
+          {
+            originX: originFallbackX,
+            originY: originFallbackY,
+            overlayX: overlayFallbackX,
+            overlayY: overlayFallbackY,
+            offsetY: -offsetY
+          }
+        ]);
   }
 
   /** Cleans up the active subscriptions. */
